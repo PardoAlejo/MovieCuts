@@ -5,21 +5,22 @@ from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.nn import functional as F
 from torchvision.models.video import r2plus1d_18
-from torchsummary import summary
 from dataset import MovieDataset
 from torch.utils.data import DataLoader
 from pytorch_lightning import loggers as pl_loggers
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
+from pytorch_lightning.callbacks import LearningRateMonitor
 import pytorch_lightning as pl
 
 def sigmoid(X):
     return 1/(1+np.exp(-X))
 
 def generate_experiment_name(args):
-    return f'experiment_sample-per-vid-{args.candidates_per_sample}' \
+    return f'experiment_sample-per-vid-{args.candidates_per_sample}'\
+            f'_lr-{args.initial_lr}'\
             f'_val-neg-ratio-{args.negative_positive_ratio_val}'\
             f'_batchsize-{args.batch_size}'\
-            f'_seed-{args.seed}'
+            f'_seed-{args.seed}_layer-2-frozen'
 
 def get_dataloader(args):
     train_dataset = MovieDataset(args.shots_file_name_train, 
@@ -67,12 +68,12 @@ class Model(pl.LightningModule):
             self.r2p1d.load_state_dict(state_dict)
 
         for name, child in self.r2p1d.named_children():
-            if name in ['layer2','layer3','layer4','avgpool','fc']:
+            if name in ['layer3','layer4','avgpool','fc']:
                 print(name + ' is unfrozen')
                 for param in child.parameters():
                     param.requires_grad = True
             else:
-                #stem layer1 frozen
+                #stem layer1 'layer2' frozen
                 print(name + ' is frozen')
                 for param in child.parameters():
                     param.requires_grad = False
@@ -104,7 +105,7 @@ class Model(pl.LightningModule):
         return {
        'optimizer': optimizer,
        'lr_scheduler': scheduler,
-       'monitor': 'metric_to_track'
+       'monitor': 'Validation_loss'
         }
 
     def bce_loss(self, logits, labels):
@@ -157,7 +158,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
     pl.utilities.seed.seed_everything(args.seed)
 
-
     early_stop_callback = EarlyStopping(
     monitor='Validation_loss',
     min_delta=0.00,
@@ -165,8 +165,11 @@ if __name__ == "__main__":
     verbose=False,
     mode='min'
     )
+    lr_monitor = LearningRateMonitor(logging_interval='step')
+
     experiment_name = generate_experiment_name(args)
     tb_logger = pl_loggers.TensorBoardLogger(args.experiments_dir, name=experiment_name)
+    
 
     trainer = pl.Trainer(gpus=-1,
                         accelerator='ddp',
@@ -175,7 +178,7 @@ if __name__ == "__main__":
                         weights_summary='top',
                         max_epochs=100,
                         logger=tb_logger,
-                        callbacks=[early_stop_callback])
+                        callbacks=[early_stop_callback, lr_monitor])
                         #,num_sanity_val_steps=0) remove santity check at some point
 
     model = Model(args)

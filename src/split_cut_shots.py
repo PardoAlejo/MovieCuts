@@ -41,7 +41,10 @@ def clip_one_video(video_filename, clip_filename, start_time, length):
     return status, None
 
 def wrapper_cut_videos(videos_csv, out_dir, num_cores):
-    
+
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
+        
     videos_df = pd.read_csv(videos_csv)
     videos_list = videos_df.values.tolist()
 
@@ -60,4 +63,4 @@ if __name__ == "__main__":
     videos_csvs = ['../data/used_cuts_train_named.csv', '../data/used_cuts_val_named.csv']
     out_dir = '../data/movies/clips'
     for video_csv in videos_csvs:
-        wrapper_cut_videos(video_csv,out_dir,num_cores=8)
+        wrapper_cut_videos(video_csv,out_dir,num_cores=40)
