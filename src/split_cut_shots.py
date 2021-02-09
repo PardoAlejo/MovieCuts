@@ -17,7 +17,8 @@ def name_cuts(videos_csv):
 def clip_one_video(video_filename, clip_filename, start_time, length):
     
     if os.path.exists(clip_filename):
-        return 'Already processed', None
+        if os.stat(clip_filename).st_size > 50000:
+            return 'Already processed', None
 
     command = ['ffmpeg',
                '-i', '"%s"' % video_filename,
@@ -61,6 +62,6 @@ def wrapper_cut_videos(videos_csv, out_dir, num_cores):
 
 if __name__ == "__main__":
     videos_csvs = ['../data/used_cuts_train_named.csv', '../data/used_cuts_val_named.csv']
-    out_dir = '../data/movies/clips'
+    out_dir = '../data/movies/clips_2.0'
     for video_csv in videos_csvs:
-        wrapper_cut_videos(video_csv,out_dir,num_cores=40)
+        wrapper_cut_videos(video_csv,out_dir,num_cores=32)
