@@ -34,13 +34,17 @@ def get_dataloader(args):
             train_dataset,
             batch_size=args.batch_size,
             num_workers=args.num_workers,
-            shuffle=False
+            shuffle=True,
+            pin_memory=True,
+            collate_fn=train_dataset.collate_fn
             )
     val_dataloader = DataLoader(
             val_dataset,
             batch_size=args.batch_size,
             num_workers=args.num_workers,
-            shuffle=False
+            shuffle=False,
+            pin_memory=True,
+            collate_fn=train_dataset.collate_fn
             )
 
     return train_dataloader, val_dataloader
@@ -80,12 +84,13 @@ class Model(pl.LightningModule):
 
 
     def forward(self, x):
+        import ipdb; ipdb.set_trace()
         predictions = self.r2p1d(x)
         return predictions
     
         
     def training_step(self, batch, batch_idx):
-        (video_chunk, labels) = batch
+        (_, video_chunk, labels) = batch
         logits = self.r2p1d(video_chunk)
         loss = self.bce_loss(logits, labels)
         self.log('Traning_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
@@ -93,7 +98,7 @@ class Model(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        (video_chunk, labels) = batch
+        (_, video_chunk, labels) = batch
         logits = self.r2p1d(video_chunk)
         loss = self.bce_loss(logits, labels)
         self.log('Validation_loss', loss, prog_bar=True, logger=True)
@@ -174,15 +179,15 @@ if __name__ == "__main__":
     trainer = pl.Trainer(gpus=-1,
                         accelerator='ddp',
                         check_val_every_n_epoch=1,
-                        progress_bar_refresh_rate=5,
+                        progress_bar_refresh_rate=10,
                         weights_summary='top',
-                        max_epochs=100,
+                        max_epochs=5,
                         logger=tb_logger,
-                        callbacks=[early_stop_callback, lr_monitor])
+                        callbacks=[early_stop_callback, lr_monitor],
+                        profiler="simple")
                         #,num_sanity_val_steps=0) remove santity check at some point
 
     model = Model(args)
-    
 
     trainer.fit(model)
 
