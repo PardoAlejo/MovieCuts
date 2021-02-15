@@ -4,6 +4,7 @@ import torch
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.nn import functional as F
+import torchvision
 from torchvision.models.video import r2plus1d_18
 from dataset import MovieDataset
 from torch.utils.data import DataLoader
@@ -11,9 +12,37 @@ from pytorch_lightning import loggers as pl_loggers
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.callbacks import LearningRateMonitor
 import pytorch_lightning as pl
+import transforms as T
+from scheduler import WarmupMultiStepLR
+
 
 def sigmoid(X):
     return 1/(1+np.exp(-X))
+
+
+def get_transforms(args):
+    
+    transform_train = torchvision.transforms.Compose(        [
+                T.ToTensorVideo(),
+                T.Resize((args.scale_h, args.scale_w)),
+                T.NormalizeVideo(
+                    mean=(0.43216, 0.394666, 0.37645), std=(0.22803, 0.22145, 0.216989)
+                ),
+                T.RandomCropVideo((args.crop_size, args.crop_size)),
+            ]
+        )
+
+    transform_val = torchvision.transforms.Compose(
+        [
+            T.ToTensorVideo(),
+            T.Resize((args.scale_h, args.scale_w)),
+            T.NormalizeVideo(
+                mean=(0.43216, 0.394666, 0.37645), std=(0.22803, 0.22145, 0.216989)
+            ),
+            T.CenterCropVideo((args.crop_size, args.crop_size)),
+        ]
+    )
+    return transform_train, transform_val
 
 def generate_experiment_name(args):
     return f'experiment_sample-per-vid-{args.candidates_per_sample}'\
@@ -23,10 +52,15 @@ def generate_experiment_name(args):
             f'_seed-{args.seed}_layer-2-frozen'
 
 def get_dataloader(args):
+    
+    transforms_train, transforms_val = get_transforms(args)
+
     train_dataset = MovieDataset(args.shots_file_name_train, 
+                    transform=transforms_train,
                     num_positives_per_scene=args.candidates_per_sample)
 
-    val_dataset = MovieDataset(args.shots_file_name_val, 
+    val_dataset = MovieDataset(args.shots_file_name_val,
+                    transform=transforms_val,
                     num_positives_per_scene=args.candidates_per_sample, 
                     negative_positive_ratio=args.negative_positive_ratio_val)
 
@@ -34,21 +68,20 @@ def get_dataloader(args):
             train_dataset,
             batch_size=args.batch_size,
             num_workers=args.num_workers,
-            shuffle=False
-            )
+            shuffle=False)
+
     val_dataloader = DataLoader(
             val_dataset,
             batch_size=args.batch_size,
             num_workers=args.num_workers,
-            shuffle=False
-            )
+            shuffle=False)
 
     return train_dataloader, val_dataloader
 
 
 class Model(pl.LightningModule):
     
-    def __init__(self, args):
+    def __init__(self, args, world_size):
         super().__init__()
         self.args = args
         self.batch_size = args.batch_size
@@ -57,33 +90,42 @@ class Model(pl.LightningModule):
         self._train_dataloader, self._val_dataloader = get_dataloader(args)
 
         self.accuracy = pl.metrics.Accuracy()
+        
+        self.world_size = world_size
+        self.lr = self.args.initial_lr * self.world_size
 
         if not self.args.from_scratch:
-            state = torch.load(self.args.model_path)
-            state_dict = self.r2p1d.state_dict()
-            for k, v in state.items():
-                if 'fc' in k:
-                    continue
-                state_dict.update({k: v})
-            self.r2p1d.load_state_dict(state_dict)
-
-        for name, child in self.r2p1d.named_children():
-            if name in ['layer3','layer4','avgpool','fc']:
-                print(name + ' is unfrozen')
-                for param in child.parameters():
-                    param.requires_grad = True
-            else:
-                #stem layer1 'layer2' frozen
-                print(name + ' is frozen')
-                for param in child.parameters():
-                    param.requires_grad = False
-
+            self._load_pretrained()
+            self.params = self._set_layers_lr()
+        else:
+            self.params = self.r2p1d.parameters()
 
     def forward(self, x):
         predictions = self.r2p1d(x)
         return predictions
-    
-        
+
+    def _load_pretrained(self):
+        state = torch.load(self.args.model_path)
+        state_dict = self.r2p1d.state_dict()
+        for k, v in state.items():
+            if 'fc' in k:
+                continue
+            state_dict.update({k: v})
+        self.r2p1d.load_state_dict(state_dict)
+
+    def _set_layers_lr(self):
+
+        params = []
+        for name, child in self.r2p1d.named_children():
+            if name == 'stem':
+                this_params = {"params": child.parameters(), "lr": 0}
+            elif name == 'fc':
+                this_params = {"params": child.parameters(), "lr": self.args.fc_lr * args.world_size}
+            else:
+                this_params = {"params": child.parameters(), "lr": self.args.initial_lr * args.world_size}
+            params.append(this_params)
+        return params
+
     def training_step(self, batch, batch_idx):
         (video_chunk, labels) = batch
         logits = self.r2p1d(video_chunk)
@@ -100,13 +142,20 @@ class Model(pl.LightningModule):
         self.log('Validation_Accuracy', self.accuracy(logits, labels), on_epoch=True, on_step=False)
 
     def configure_optimizers(self):
-        optimizer = Adam(self.r2p1d.parameters(), lr=self.args.initial_lr)
-        scheduler = ReduceLROnPlateau(optimizer, 'min', factor=self.args.lr_decay, patience=self.args.lr_patience, verbose=True)
-        return {
-       'optimizer': optimizer,
-       'lr_scheduler': scheduler,
-       'monitor': 'Validation_loss'
-        }
+        optimizer = torch.optim.SGD(self.params, 
+                                    lr=self.lr, 
+                                    momentum=self.args.momentum, 
+                                    weight_decay=self.args.weight_decay)
+
+        warmup_iters = self.args.lr_warmup_epochs * len(self._train_dataloader)
+        lr_milestones = [len(self._train_dataloader) * m for m in self.args.lr_milestones]
+
+        lr_scheduler = WarmupMultiStepLR(optimizer,
+                                        milestones=lr_milestones,
+                                        gamma=args.lr_gamma,
+                                        warmup_iters=warmup_iters,
+                                        warmup_factor=1e-5)
+        return [optimizer], [lr_scheduler]
 
     def bce_loss(self, logits, labels):
         bce = F.binary_cross_entropy_with_logits(logits.squeeze(),labels.type_as(logits))
@@ -128,20 +177,46 @@ if __name__ == "__main__":
                         help='Shots for training')
     parser.add_argument('--shots_file_name_val', type=str, default='../data/used_cuts_val.csv',
                         help='Shots for validation')
+
+    # Reading arguments
+    parser.add_argument("--scale_h", default=128, type=int,
+                        help="Scale H to read")
+    parser.add_argument("--scale_w", default=174, type=int,
+                        help="Scale H to read")
+    parser.add_argument("--crop_size", default=112, type=int, 
+                        help="number of frames per clip")
+
+
     parser.add_argument('--candidates_per_sample', type=int, default=10,
                         help='Number of candidates per sample')
     parser.add_argument('--negative_positive_ratio_val', type=int, default=5,
                         help='Ratio for negatives:positives for validation')
-    parser.add_argument('--batch_size', type=int, default=8,
-                        help='batch size')
-    parser.add_argument('--initial_lr', type=float, default=0.0002,
-                        help='Starting lr')
-    parser.add_argument('--lr_decay', type=float, default=0.9,
-                        help='Lr decay')
-    parser.add_argument('--lr_patience', type=int, default=1,
-                        help='iteration patience to reduce LR')
     parser.add_argument('--num_workers', type=int, default=8,
                         help='Number of workers for data loading')
+    
+    # Batch Size and initial learning rates
+    parser.add_argument('--batch_size', type=int, default=8,
+                        help='batch size')
+    parser.add_argument("--initial_lr", default=0.001, type=float, 
+                        help="initial learning rate")
+    parser.add_argument("--fc_lr", default=0.01, type=float, 
+                        help="fully connected learning rate")
+
+    # Scheduler parameters
+    parser.add_argument("--momentum", default=0.9, type=float,
+                        help="momentum")
+    parser.add_argument('--lr_decay', type=float, default=0.9,
+                        help='Lr decay')
+    parser.add_argument("--weight-decay", default=1e-4, type=float, 
+                        help="weight decay (default: 1e-4)")
+    parser.add_argument("--lr-milestones",nargs="+",default=[4, 6, 8],
+                        type=int,help="decrease lr on milestones")
+    parser.add_argument("--lr-gamma",default=0.1,type=float,
+                        help="decrease lr by a factor of lr-gamma")
+    parser.add_argument("--lr-warmup-epochs", default=2, type=int,
+                        help="number of warmup epochs")
+
+
     parser.add_argument('--from_scratch', action='store_false',
                         help='Start training from scratct,' 
                         ' starting from K-400 by default')
@@ -172,17 +247,18 @@ if __name__ == "__main__":
     
 
     trainer = pl.Trainer(gpus=-1,
+                        benchmark=True,
+                        sync_batchnorm=True,
                         accelerator='ddp',
-                        check_val_every_n_epoch=1,
+                        check_val_every_n_epoch=2,
                         progress_bar_refresh_rate=5,
                         weights_summary='top',
-                        max_epochs=100,
+                        max_epochs=10,
                         logger=tb_logger,
-                        callbacks=[early_stop_callback, lr_monitor])
+                        callbacks=[early_stop_callback, lr_monitor],
+                        profiler="simple")
                         #,num_sanity_val_steps=0) remove santity check at some point
 
-    model = Model(args)
-    
+    model = Model(args, world_size=trainer.num_gpus)
 
     trainer.fit(model)
-
