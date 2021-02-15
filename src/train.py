@@ -101,6 +101,7 @@ class Model(pl.LightningModule):
             self.params = self.r2p1d.parameters()
 
     def forward(self, x):
+        import ipdb; ipdb.set_trace()
         predictions = self.r2p1d(x)
         return predictions
 
@@ -127,7 +128,7 @@ class Model(pl.LightningModule):
         return params
 
     def training_step(self, batch, batch_idx):
-        (video_chunk, labels) = batch
+        (_, video_chunk, labels) = batch
         logits = self.r2p1d(video_chunk)
         loss = self.bce_loss(logits, labels)
         self.log('Traning_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
@@ -135,7 +136,7 @@ class Model(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        (video_chunk, labels) = batch
+        (_, video_chunk, labels) = batch
         logits = self.r2p1d(video_chunk)
         loss = self.bce_loss(logits, labels)
         self.log('Validation_loss', loss, prog_bar=True, logger=True)

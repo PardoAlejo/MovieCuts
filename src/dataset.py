@@ -5,6 +5,9 @@ import os
 import numpy as np
 import ffmpeg
 import tqdm
+import decord as de
+de.bridge.set_bridge('torch')
+
 
 class MovieDataset(Dataset):
     """Construct an untrimmed video classification dataset."""
@@ -84,7 +87,7 @@ class MovieDataset(Dataset):
     #     return frames
 
     def __len__(self):
-        return (len(self.candidates))
+        return (len(self.candidates_per_video))
     
     def __getitem__(self, idx):
         video_path = f'{self.videos_path}/{self.candidates[idx][0]}/{self.candidates[idx][0]}.mp4'
@@ -92,7 +95,7 @@ class MovieDataset(Dataset):
         end_time = self.candidates[idx][4]
         label = self.labels[idx]
 
-        if os.path.isfile(video_path):
+    #     if os.path.isfile(video_path):
             
             if label == 1:
 

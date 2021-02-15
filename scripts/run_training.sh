@@ -16,6 +16,6 @@ cd ../src
 python train.py --shots_file_name_train ../data/used_cuts_train.csv \
                 --shots_file_name_val ../data/used_cuts_val.csv \
                 --num_workers 8 \
-                --batch_size 96 \
-                --initial_lr 0.0001 \
+                --batch_size 12 \
+                --initial_lr 0.001 \
                 
