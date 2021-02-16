@@ -62,7 +62,7 @@ def get_dataloader(args):
     print(f'Num samples for train: {len(train_dataset)}')
     val_dataset = MovieDataset(args.shots_file_name_val,
                     transform=transforms_val,
-                    num_positives_per_scene=args.candidates_per_sscene, 
+                    num_positives_per_scene=args.candidates_per_scene, 
                     negative_positive_ratio=args.negative_positive_ratio_val)
     print(f'Num samples for val: {len(val_dataset)}')
     train_dataloader = DataLoader(
