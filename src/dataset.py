@@ -61,7 +61,7 @@ class MovieDataset(Dataset):
         )
 
         clip = np.frombuffer(out, np.uint8).reshape([-1, self.height, self.width, 3])
-        clip = torch.from_numpy(clip)
+        clip = torch.from_numpy(clip.astype('uint8'))
 
         return clip
 
