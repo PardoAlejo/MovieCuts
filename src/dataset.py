@@ -17,7 +17,8 @@ class MovieDataset(Dataset):
                  negative_positive_ratio=1,
                  snippet_size=16,
                  stride=8,
-                 fps=24,
+                 original_fps=24,
+                 network_fps=15,   
                  size=(112, 112),
                  seed=424242):
     
@@ -30,7 +31,8 @@ class MovieDataset(Dataset):
         self.mode = 'train' if 'train' in shots_filename else 'val'
         self.snippet_size = snippet_size
         self.stride = stride
-        self.fps = fps
+        self.original_fps = original_fps
+        self.network_fps = network_fps
         self.height, self.width = size
         self.seed = seed
         self.num_positives_per_scene = num_positives_per_scene
@@ -48,11 +50,11 @@ class MovieDataset(Dataset):
         return avg_num_shots
 
     def get_clip_ffmpeg(self, video_path, start_time, time_span=1):
-        vframes = int(time_span*self.fps)
+        vframes = int(time_span*self.original_fps)
         cmd = (
             ffmpeg
             .input(video_path, ss=start_time)
-            .filter('fps', fps=self.fps)
+            .filter('fps', fps=self.original_fps)
             .filter('scale', self.width, self.height)
             )
         out, _ = (
@@ -68,6 +70,18 @@ class MovieDataset(Dataset):
     def __len__(self):
         return (len(self.candidates))
     
+    def resample_video_idx(self, num_frames, original_fps, new_fps):
+        step = float(original_fps) / new_fps
+        if step.is_integer():
+            # optimization: if step is integer, don't need to perform
+            # advanced indexing
+            step = int(step)
+            return slice(None, None, step)
+        idxs = torch.arange(num_frames, dtype=torch.float32) * step
+        idxs = idxs.floor().to(torch.int64)
+        
+        return idxs
+
     def __getitem__(self, idx):
         video_path = f'{self.videos_path}/{self.candidates[idx][0]}/{self.candidates[idx][0]}.mp4'
         start_time = self.candidates[idx][3]-0.5
@@ -94,7 +108,9 @@ class MovieDataset(Dataset):
         if self.transform:
             clip = self.transform(clip)
 
-        return clip, label
+        idx = self.resample_video_idx(clip.shape[0], self.original_fps, self.network_fps)
+
+        return clip[:,idx,:,:], label
 
     def set_candidates(self):
         print(f'Setting candidates for {self.mode}')
