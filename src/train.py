@@ -45,7 +45,7 @@ def get_transforms(args):
     return transform_train, transform_val
 
 def generate_experiment_name(args):
-    return f'experiment_sample-per-vid-{args.candidates_per_sample}'\
+    return f'experiment_sample-per-vid-{args.candidates_per_scene}'\
             f'_lr-{args.initial_lr}'\
             f'_val-neg-ratio-{args.negative_positive_ratio_val}'\
             f'_batchsize-{args.batch_size}'\
