@@ -49,7 +49,7 @@ def generate_experiment_name(args):
             f'_lr-{args.initial_lr}'\
             f'_val-neg-ratio-{args.negative_positive_ratio_val}'\
             f'_batchsize-{args.batch_size}'\
-            f'_seed-{args.seed}_layer-2-frozen'
+            f'_seed-{args.seed}'
 
 def get_dataloader(args):
     
@@ -57,13 +57,14 @@ def get_dataloader(args):
 
     train_dataset = MovieDataset(args.shots_file_name_train, 
                     transform=transforms_train,
-                    num_positives_per_scene=args.candidates_per_sample)
+                    num_positives_per_scene=args.candidates_per_scene)
 
+    print(f'Num samples for train: {len(train_dataset)}')
     val_dataset = MovieDataset(args.shots_file_name_val,
                     transform=transforms_val,
-                    num_positives_per_scene=args.candidates_per_sample, 
+                    num_positives_per_scene=args.candidates_per_sscene, 
                     negative_positive_ratio=args.negative_positive_ratio_val)
-
+    print(f'Num samples for val: {len(val_dataset)}')
     train_dataloader = DataLoader(
             train_dataset,
             batch_size=args.batch_size,
@@ -128,19 +129,34 @@ class Model(pl.LightningModule):
         return params
 
     def training_step(self, batch, batch_idx):
-        (_, video_chunk, labels) = batch
+        (video_chunk, labels) = batch
         logits = self.r2p1d(video_chunk)
         loss = self.bce_loss(logits, labels)
-        self.log('Traning_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
-        self.log('Training_Accuracy', self.accuracy(logits, labels), on_epoch=True, on_step=False)
+        self.log('Traning_loss', loss, 
+                    on_step=True, 
+                    on_epoch=True, 
+                    prog_bar=True, 
+                    logger=True)
+        self.log('Training_Accuracy', 
+                    self.accuracy(logits, labels), 
+                    on_epoch=True, 
+                    on_step=False, 
+                    logger=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        (_, video_chunk, labels) = batch
+        (video_chunk, labels) = batch
         logits = self.r2p1d(video_chunk)
         loss = self.bce_loss(logits, labels)
-        self.log('Validation_loss', loss, prog_bar=True, logger=True)
-        self.log('Validation_Accuracy', self.accuracy(logits, labels), on_epoch=True, on_step=False)
+        self.log('Validation_loss', 
+                loss, 
+                prog_bar=True, 
+                logger=True)
+
+        self.log('Validation_Accuracy', 
+                self.accuracy(logits, labels), 
+                prog_bar=True,
+                logger=True)
 
     def configure_optimizers(self):
         optimizer = torch.optim.SGD(self.params, 
@@ -159,7 +175,9 @@ class Model(pl.LightningModule):
         return [optimizer], [lr_scheduler]
 
     def bce_loss(self, logits, labels):
-        bce = F.binary_cross_entropy_with_logits(logits.squeeze(),labels.type_as(logits))
+        bce = F.binary_cross_entropy_with_logits(
+                logits.squeeze(),
+                labels.type_as(logits))
         total_loss = bce
         return total_loss
 
@@ -188,8 +206,8 @@ if __name__ == "__main__":
                         help="number of frames per clip")
 
 
-    parser.add_argument('--candidates_per_sample', type=int, default=10,
-                        help='Number of candidates per sample')
+    parser.add_argument('--candidates_per_scene', type=int, default=10,
+                        help='Number of candidates per scene')
     parser.add_argument('--negative_positive_ratio_val', type=int, default=5,
                         help='Ratio for negatives:positives for validation')
     parser.add_argument('--num_workers', type=int, default=8,

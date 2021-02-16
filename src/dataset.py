@@ -5,9 +5,6 @@ import os
 import numpy as np
 import ffmpeg
 import tqdm
-import decord as de
-de.bridge.set_bridge('torch')
-
 
 class MovieDataset(Dataset):
     """Construct an untrimmed video classification dataset."""
@@ -15,13 +12,13 @@ class MovieDataset(Dataset):
     def __init__(self,
                  shots_filename,
                  transform=None,
-                 videos_path = '../data/movies/youtube/',
+                 videos_path = '/tmp/youtube/',
                  num_positives_per_scene=5,
                  negative_positive_ratio=1,
                  snippet_size=16,
                  stride=8,
                  fps=24,
-                 size=(112,112),
+                 size=(112, 112),
                  seed=424242):
     
         self.shots_df = pd.read_csv(shots_filename)
@@ -50,7 +47,8 @@ class MovieDataset(Dataset):
         avg_num_shots = num_shots/len(self.shots_df_by_id)
         return avg_num_shots
 
-    def get_clip_ffmpeg(self, video_path, start_time, vframes=16):
+    def get_clip_ffmpeg(self, video_path, start_time, time_span=1):
+        vframes = int(time_span*self.fps)
         cmd = (
             ffmpeg
             .input(video_path, ss=start_time)
@@ -63,28 +61,9 @@ class MovieDataset(Dataset):
         )
 
         clip = np.frombuffer(out, np.uint8).reshape([-1, self.height, self.width, 3])
-        clip = torch.from_numpy(clip.astype('uint8'))
-        # clip = clip.permute(3, 0, 1, 2)
+        clip = torch.from_numpy(clip)
 
         return clip
-
-    # def cut_clip_decord(self, vr, start_time, frame_span=24):
-    #     fps = round(vr.get_avg_fps())
-    #     start_frame = int(np.ceil(start_time * self.fps))
-    #     end_frame = start_frame + frame_span
-    #     frames = vr.get_batch(range(start_frame, end_frame, 1))
-    #     return frames.type(torch.float32)
-
-    # def get_clip_decord(self, video_path, start_time, time_span=1):
-    #     ctx = de.gpu(0)
-
-    #     vr = de.VideoReader(video_path, ctx, width=self.width, height=self.height)
-    #     fps = round(vr.get_avg_fps())
-    #     start_frame = int(np.ceil(start_time*fps))
-    #     end_frame = int(np.floor(start_frame + fps*time_span))
-    #     frames = vr.get_batch(range(start_frame, end_frame, 1))
-
-    #     return frames
 
     def __len__(self):
         return (len(self.candidates_per_video))
@@ -95,7 +74,7 @@ class MovieDataset(Dataset):
         end_time = self.candidates[idx][4]
         label = self.labels[idx]
 
-    #     if os.path.isfile(video_path):
+        if os.path.isfile(video_path):
             
             if label == 1:
 
@@ -103,8 +82,8 @@ class MovieDataset(Dataset):
 
             if label == 0:
 
-                clip_left = self.get_clip_ffmpeg(video_path, start_time, vframes=int(self.snippet_size/2))
-                clip_right = self.get_clip_ffmpeg(video_path, end_time, vframes=int(self.snippet_size/2))
+                clip_left = self.get_clip_ffmpeg(video_path, start_time, time_span=0.5)
+                clip_right = self.get_clip_ffmpeg(video_path, end_time, time_span=0.5)
                 clip = torch.cat((clip_left, clip_right), dim=0)
                 
                 
