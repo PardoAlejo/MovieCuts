@@ -12,7 +12,7 @@ class MovieDataset(Dataset):
     def __init__(self,
                  shots_filename,
                  transform=None,
-                 videos_path = '/tmp/youtube/',
+                 videos_path = '/tmp/youtube',
                  num_positives_per_scene=5,
                  negative_positive_ratio=1,
                  snippet_size=16,
@@ -66,7 +66,7 @@ class MovieDataset(Dataset):
         return clip
 
     def __len__(self):
-        return (len(self.candidates_per_video))
+        return (len(self.candidates))
     
     def __getitem__(self, idx):
         video_path = f'{self.videos_path}/{self.candidates[idx][0]}/{self.candidates[idx][0]}.mp4'
