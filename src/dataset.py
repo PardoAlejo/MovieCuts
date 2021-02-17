@@ -33,6 +33,7 @@ class MovieDataset(Dataset):
         self.stride = stride
         self.original_fps = original_fps
         self.network_fps = network_fps
+        self.time_span = self.snippet_size/self.network_fps
         self.height, self.width = size
         self.seed = seed
         self.num_positives_per_scene = num_positives_per_scene
@@ -49,7 +50,7 @@ class MovieDataset(Dataset):
         avg_num_shots = num_shots/len(self.shots_df_by_id)
         return avg_num_shots
 
-    def get_clip_ffmpeg(self, video_path, start_time, time_span=1):
+    def get_clip_ffmpeg(self, video_path, start_time, time_span):
         vframes = int(time_span*self.original_fps)
         cmd = (
             ffmpeg
@@ -77,7 +78,7 @@ class MovieDataset(Dataset):
             # advanced indexing
             step = int(step)
             return slice(None, None, step)
-        idxs = torch.arange(num_frames, dtype=torch.float32) * step
+        idxs = torch.arange(num_frames-1, dtype=torch.float32) * step
         idxs = idxs.floor().to(torch.int64)
         
         return idxs
@@ -87,29 +88,28 @@ class MovieDataset(Dataset):
         start_time = self.candidates[idx][3]-0.5
         end_time = self.candidates[idx][4]
         label = self.labels[idx]
-
+        
         if os.path.isfile(video_path):
             
             if label == 1:
 
-                clip = self.get_clip_ffmpeg(video_path, start_time)
+                clip = self.get_clip_ffmpeg(video_path, start_time, time_span=self.time_span)
 
             if label == 0:
-
-                clip_left = self.get_clip_ffmpeg(video_path, start_time, time_span=0.5)
-                clip_right = self.get_clip_ffmpeg(video_path, end_time, time_span=0.5)
+                clip_left = self.get_clip_ffmpeg(video_path, start_time, time_span=self.time_span*0.5)
+                clip_right = self.get_clip_ffmpeg(video_path, end_time, time_span=self.time_span*0.5)
                 clip = torch.cat((clip_left, clip_right), dim=0)
                 
                 
         else:
             print(f'{video_path} video does not exist')
             clip = torch.zeros(1)
+
+        idx = self.resample_video_idx(self.snippet_size, self.original_fps, self.network_fps)
         
         if self.transform:
             clip = self.transform(clip)
-
-        idx = self.resample_video_idx(clip.shape[0], self.original_fps, self.network_fps)
-
+            
         return clip[:,idx,:,:], label
 
     def set_candidates(self):

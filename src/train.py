@@ -275,9 +275,9 @@ if __name__ == "__main__":
                         max_epochs=10,
                         logger=tb_logger,
                         callbacks=[early_stop_callback, lr_monitor],
-                        profiler="simple")
-                        #,num_sanity_val_steps=0) remove santity check at some point
-
+                        profiler="simple",
+                        num_sanity_val_steps=0) 
+                        
     model = Model(args, world_size=trainer.num_gpus)
 
     trainer.fit(model)
