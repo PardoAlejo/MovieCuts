@@ -16,21 +16,19 @@ class MovieDataset(Dataset):
                  num_positives_per_scene=5,
                  negative_positive_ratio=1,
                  snippet_size=16,
-                 stride=8,
                  original_fps=24,
                  network_fps=15,   
                  size=(112, 112),
                  seed=424242):
     
         self.shots_df = pd.read_csv(shots_filename)
-        self.shots_df_by_id = self.shots_df.groupby('video_id')
+        self.shots_df_by_video_id = self.shots_df.groupby('video_id')
         self.videos_path = videos_path
 
         self.transform = transform
 
         self.mode = 'train' if 'train' in shots_filename else 'val'
         self.snippet_size = snippet_size
-        self.stride = stride
         self.original_fps = original_fps
         self.network_fps = network_fps
         self.time_span = self.snippet_size/self.network_fps
@@ -45,9 +43,9 @@ class MovieDataset(Dataset):
 
     def get_average_shots_per_scene(self):
         num_shots = 0
-        for name, df in self.shots_df_by_id:
+        for name, df in self.shots_df_by_video_id:
             num_shots += len(df)
-        avg_num_shots = num_shots/len(self.shots_df_by_id)
+        avg_num_shots = num_shots/len(self.shots_df_by_video_id)
         return avg_num_shots
 
     def get_clip_ffmpeg(self, video_path, start_time, time_span):
@@ -56,7 +54,6 @@ class MovieDataset(Dataset):
             ffmpeg
             .input(video_path, ss=start_time)
             .filter('fps', fps=self.original_fps)
-            .filter('scale', self.width, self.height)
             )
         out, _ = (
         cmd.output('pipe:', format='rawvideo', pix_fmt='rgb24', vframes=vframes)
@@ -85,7 +82,7 @@ class MovieDataset(Dataset):
 
     def __getitem__(self, idx):
         video_path = f'{self.videos_path}/{self.candidates[idx][0]}/{self.candidates[idx][0]}.mp4'
-        start_time = self.candidates[idx][3]-0.5
+        start_time = self.candidates[idx][3]-self.time_span*0.5
         end_time = self.candidates[idx][4]
         label = self.labels[idx]
         
@@ -99,25 +96,25 @@ class MovieDataset(Dataset):
                 clip_left = self.get_clip_ffmpeg(video_path, start_time, time_span=self.time_span*0.5)
                 clip_right = self.get_clip_ffmpeg(video_path, end_time, time_span=self.time_span*0.5)
                 clip = torch.cat((clip_left, clip_right), dim=0)
-                
+                 
                 
         else:
             print(f'{video_path} video does not exist')
             clip = torch.zeros(1)
 
-        idx = self.resample_video_idx(self.snippet_size, self.original_fps, self.network_fps)
+        idxs = self.resample_video_idx(self.snippet_size, self.original_fps, self.network_fps)
         
         if self.transform:
             clip = self.transform(clip)
             
-        return clip[:,idx,:,:], label
+        return clip[:,idxs,:,:], label
 
     def set_candidates(self):
         print(f'Setting candidates for {self.mode}')
         self.candidates = []
         self.labels = []
         self.candidates_per_video = {}
-        for name, df in self.shots_df_by_id:
+        for name, df in self.shots_df_by_video_id:
             this_candidates = []
             this_labels = []
             self.candidates_per_video[name] = {}
