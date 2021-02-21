@@ -1,5 +1,4 @@
 import numpy as np
-import argparse
 import torch
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
@@ -14,10 +13,10 @@ from pytorch_lightning.callbacks import LearningRateMonitor
 import pytorch_lightning as pl
 import transforms as T
 from scheduler import WarmupMultiStepLR
-
+from parameters import get_params
 
 def sigmoid(X):
-    return 1/(1+np.exp(-X))
+    return 1/(1+torch.exp(-X.squeeze()))
 
 
 def get_transforms(args):
@@ -57,14 +56,18 @@ def get_dataloader(args):
 
     train_dataset = MovieDataset(args.shots_file_name_train, 
                     transform=transforms_train,
-                    num_positives_per_scene=args.candidates_per_scene)
-
+                    num_positives_per_scene=args.candidates_per_scene,
+                    size=(args.scale_w, args.scale_h))
     print(f'Num samples for train: {len(train_dataset)}')
+
     val_dataset = MovieDataset(args.shots_file_name_val,
                     transform=transforms_val,
                     num_positives_per_scene=args.candidates_per_scene, 
-                    negative_positive_ratio=args.negative_positive_ratio_val)
+                    negative_positive_ratio=args.negative_positive_ratio_val,
+                    size=(args.scale_w, args.scale_h))
+
     print(f'Num samples for val: {len(val_dataset)}')
+
     train_dataloader = DataLoader(
             train_dataset,
             batch_size=args.batch_size,
@@ -100,6 +103,8 @@ class Model(pl.LightningModule):
             self.params = self._set_layers_lr()
         else:
             self.params = self.r2p1d.parameters()
+
+        self.save_hyperparameters()
 
     def forward(self, x):
         import ipdb; ipdb.set_trace()
@@ -138,7 +143,8 @@ class Model(pl.LightningModule):
                     prog_bar=True, 
                     logger=True)
         self.log('Training_Accuracy', 
-                    self.accuracy(logits, labels), 
+                    self.accuracy(sigmoid(logits), labels),
+                    prog_bar=True, 
                     on_epoch=True, 
                     on_step=False, 
                     logger=True)
@@ -154,7 +160,21 @@ class Model(pl.LightningModule):
                 logger=True)
 
         self.log('Validation_Accuracy', 
-                self.accuracy(logits, labels), 
+                self.accuracy(sigmoid(logits), labels), 
+                prog_bar=True,
+                logger=True)
+    
+    def test_step(self, batch, batch_idx):
+        (video_chunk, labels) = batch
+        logits = self.r2p1d(video_chunk)
+        loss = self.bce_loss(logits, labels)
+        self.log('Test_loss', 
+                loss, 
+                prog_bar=True, 
+                logger=True)
+
+        self.log('Test_Accuracy', 
+                self.accuracy(sigmoid(logits), labels), 
                 prog_bar=True,
                 logger=True)
 
@@ -178,8 +198,7 @@ class Model(pl.LightningModule):
         bce = F.binary_cross_entropy_with_logits(
                 logits.squeeze(),
                 labels.type_as(logits))
-        total_loss = bce
-        return total_loss
+        return bce
 
     def train_dataloader(self):
         return self._train_dataloader
@@ -188,68 +207,14 @@ class Model(pl.LightningModule):
     def val_dataloader(self):
         return self._val_dataloader
 
+    def test_dataloader(self):
+        return self._val_dataloader
+
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Easy video feature extractor')
-    
-    parser.add_argument('--shots_file_name_train', type=str, default='../data/used_cuts_train.csv',
-                        help='Shots for training')
-    parser.add_argument('--shots_file_name_val', type=str, default='../data/used_cuts_val.csv',
-                        help='Shots for validation')
 
-    # Reading arguments
-    parser.add_argument("--scale_h", default=128, type=int,
-                        help="Scale H to read")
-    parser.add_argument("--scale_w", default=174, type=int,
-                        help="Scale H to read")
-    parser.add_argument("--crop_size", default=112, type=int, 
-                        help="number of frames per clip")
-
-
-    parser.add_argument('--candidates_per_scene', type=int, default=10,
-                        help='Number of candidates per scene')
-    parser.add_argument('--negative_positive_ratio_val', type=int, default=5,
-                        help='Ratio for negatives:positives for validation')
-    parser.add_argument('--num_workers', type=int, default=8,
-                        help='Number of workers for data loading')
-    
-    # Batch Size and initial learning rates
-    parser.add_argument('--batch_size', type=int, default=8,
-                        help='batch size')
-    parser.add_argument("--initial_lr", default=0.001, type=float, 
-                        help="initial learning rate")
-    parser.add_argument("--fc_lr", default=0.01, type=float, 
-                        help="fully connected learning rate")
-
-    # Scheduler parameters
-    parser.add_argument("--momentum", default=0.9, type=float,
-                        help="momentum")
-    parser.add_argument('--lr_decay', type=float, default=0.9,
-                        help='Lr decay')
-    parser.add_argument("--weight-decay", default=1e-4, type=float, 
-                        help="weight decay (default: 1e-4)")
-    parser.add_argument("--lr-milestones",nargs="+",default=[4, 6, 8],
-                        type=int,help="decrease lr on milestones")
-    parser.add_argument("--lr-gamma",default=0.1,type=float,
-                        help="decrease lr by a factor of lr-gamma")
-    parser.add_argument("--lr-warmup-epochs", default=2, type=int,
-                        help="number of warmup epochs")
-
-
-    parser.add_argument('--from_scratch', action='store_false',
-                        help='Start training from scratct,' 
-                        ' starting from K-400 by default')
-    parser.add_argument('--model_path', type=str, 
-                        default='../models/r2plus1d_18-91a641e6.pth',
-                        help='pretrained K400 model path')
-    parser.add_argument('--num_classes', type=int, default=1,
-                        help='Number of classes')
-    parser.add_argument('--seed', type=int, default=4165,
-                        help='Number of classes')
-    parser.add_argument('--experiments_dir', type=str, default='../experiments',
-                        help='Number of classes')
-                        
-    args = parser.parse_args()
+    args = get_params()
+    print(args)
     pl.utilities.seed.seed_everything(args.seed)
 
     early_stop_callback = EarlyStopping(
@@ -268,15 +233,21 @@ if __name__ == "__main__":
                         benchmark=True,
                         sync_batchnorm=True,
                         accelerator='ddp',
-                        check_val_every_n_epoch=2,
+                        check_val_every_n_epoch=1,
                         progress_bar_refresh_rate=5,
                         weights_summary='top',
                         max_epochs=10,
                         logger=tb_logger,
                         callbacks=[lr_monitor],
                         profiler="simple",
-                        num_sanity_val_steps=0) 
+                        num_sanity_val_steps=2) 
 
     model = Model(args, world_size=trainer.num_gpus)
 
-    trainer.fit(model)
+    if args.test:
+        path = args.checkpoint
+        model_test = Model.load_from_checkpoint(path, args=args, world_size=trainer.num_gpus)
+        print(f'Testing model from: {path}')
+        trainer.test(model_test)
+    else:
+        trainer.fit(model)
