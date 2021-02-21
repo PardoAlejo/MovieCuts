@@ -16,6 +16,7 @@ class MovieDataset(Dataset):
                  videos_path = '/tmp/youtube',
                  num_positives_per_scene=5,
                  negative_positive_ratio=1,
+                 across_scene_negs=False,
                  snippet_size=16,
                  original_fps=24,
                  network_fps=15,   
@@ -24,11 +25,13 @@ class MovieDataset(Dataset):
     
         self.shots_df = pd.read_csv(shots_filename)
         self.shots_df_by_video_id = self.shots_df.groupby('video_id')
+        self.shots_df_by_movie_id = self.shots_df.groupby('movie_id')
         self.videos_path = videos_path
 
         self.transform = transform
 
         self.mode = 'train' if 'train' in shots_filename else 'val'
+        self.across_scene_negs = across_scene_negs
         self.snippet_size = snippet_size
         self.original_fps = original_fps
         self.network_fps = network_fps
@@ -95,8 +98,15 @@ class MovieDataset(Dataset):
                 clip = self.get_clip_ffmpeg(video_path, start_time, time_span=self.time_span)
 
             if label == 0:
-                clip_left = self.get_clip_ffmpeg(video_path, start_time, time_span=self.time_span*0.5)
-                clip_right = self.get_clip_ffmpeg(video_path, end_time, time_span=self.time_span*0.5)
+                if self.across_scene_negs:
+                    left_path = f'{self.videos_path}/{self.candidates[idx][0]}/{self.candidates[idx][0]}.mp4'
+                    clip_left = self.get_clip_ffmpeg(left_path, start_time, time_span=self.time_span*0.5)
+                    rigth_path = f'{self.videos_path}/{self.candidates[idx][-2]}/{self.candidates[idx][-2]}.mp4'
+                    clip_right = self.get_clip_ffmpeg(rigth_path, end_time, time_span=self.time_span*0.5)
+                else:
+                    clip_left = self.get_clip_ffmpeg(video_path, start_time, time_span=self.time_span*0.5)
+                    clip_right = self.get_clip_ffmpeg(video_path, end_time, time_span=self.time_span*0.5)
+
                 clip = torch.cat((clip_left, clip_right), dim=0)
                  
                 
@@ -127,10 +137,21 @@ class MovieDataset(Dataset):
                 this_candidates.append(df.sample().values.tolist()[0])
                 this_labels.append(1)
                 # Find negative candidates
-                for i in range(self.negative_positive_ratio):    
-                    negative = df.sample().values.tolist()[0][0:3]
-                    negative.extend(df.sample().values.tolist()[0][3:])
-                    self.candidates.append(negative)
+                for i in range(self.negative_positive_ratio):  
+                    negative = df.sample().values.tolist()[0]
+                    movie_id = negative[-1]
+                    negative = negative[0:3]
+                    if self.across_scene_negs:
+                        # get a sample of a random scene of the same movie
+                        right = self.shots_df[self.shots_df.movie_id == movie_id].sample()
+                        vid_id = right.video_id.values[0]
+                        # Store the scene id to read from
+                        right_vid = right.values.tolist()[0]
+                        right_vid[-2] = vid_id
+                        negative.extend(right_vid[3:])
+                    else:
+                        negative.extend(df.sample().values.tolist()[0][3:])
+                    this_candidates.append(negative)
                     this_labels.append(0)
             self.candidates.extend(this_candidates)
             self.labels.extend(this_labels)

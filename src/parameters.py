@@ -22,10 +22,14 @@ def get_params():
                         help='Number of candidates per scene')
     parser.add_argument('--negative_positive_ratio_val', type=int, default=5,
                         help='Ratio for negatives:positives for validation')
-    parser.add_argument('--num_workers', type=int, default=8,
-                        help='Number of workers for data loading')
+    parser.add_argument('--across_scene_negs', action='store_true',
+                        help='Take across scene negatives or not, default same scene')
+
+    
 
     # Batch Size and initial learning rates
+    parser.add_argument('--num_workers', type=int, default=8,
+                        help='Number of workers for data loading')
     parser.add_argument('--batch_size', type=int, default=8,
                         help='batch size')
     parser.add_argument("--initial_lr", default=0.001, type=float, 

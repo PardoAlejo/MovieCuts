@@ -45,6 +45,7 @@ def get_transforms(args):
 
 def generate_experiment_name(args):
     return f'experiment_sample-per-vid-{args.candidates_per_scene}'\
+            f'across_scene_negs-{args.across_scene_negs}'\
             f'_lr-{args.initial_lr}'\
             f'_val-neg-ratio-{args.negative_positive_ratio_val}'\
             f'_batchsize-{args.batch_size}'\
@@ -57,14 +58,16 @@ def get_dataloader(args):
     train_dataset = MovieDataset(args.shots_file_name_train, 
                     transform=transforms_train,
                     num_positives_per_scene=args.candidates_per_scene,
-                    size=(args.scale_w, args.scale_h))
+                    size=(args.scale_w, args.scale_h),
+                    across_scene_negs=args.across_scene_negs)
     print(f'Num samples for train: {len(train_dataset)}')
 
     val_dataset = MovieDataset(args.shots_file_name_val,
                     transform=transforms_val,
                     num_positives_per_scene=args.candidates_per_scene, 
                     negative_positive_ratio=args.negative_positive_ratio_val,
-                    size=(args.scale_w, args.scale_h))
+                    size=(args.scale_w, args.scale_h),
+                    across_scene_negs=args.across_scene_negs)
 
     print(f'Num samples for val: {len(val_dataset)}')
 
