@@ -1,7 +1,9 @@
-*/__pychache__/
+*/__pycache__/
 */examples/
 examples/
 __pychache__/
 misc/
 experiments/
 models/
+data/*sample*
+data/movies
