@@ -5,6 +5,7 @@ import os
 import numpy as np
 import ffmpeg
 import tqdm
+from torchvision.io import write_video
 
 class MovieDataset(Dataset):
     """Construct an untrimmed video classification dataset."""
@@ -54,13 +55,14 @@ class MovieDataset(Dataset):
             ffmpeg
             .input(video_path, ss=start_time)
             .filter('fps', fps=self.original_fps)
+            .filter('scale', 1280, 720)
             )
         out, _ = (
         cmd.output('pipe:', format='rawvideo', pix_fmt='rgb24', vframes=vframes)
         .run(capture_stdout=True, quiet=True)
         )
 
-        clip = np.frombuffer(out, np.uint8).reshape([-1, self.height, self.width, 3])
+        clip = np.frombuffer(out, np.uint8).reshape([-1, 720, 1280, 3])
         clip = torch.from_numpy(clip.astype('uint8'))
 
         return clip
