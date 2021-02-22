@@ -14,6 +14,7 @@ import pytorch_lightning as pl
 import transforms as T
 from scheduler import WarmupMultiStepLR
 from parameters import get_params
+from torchvision.io import write_video
 
 def sigmoid(X):
     return 1/(1+torch.exp(-X.squeeze()))
@@ -110,7 +111,6 @@ class Model(pl.LightningModule):
         self.save_hyperparameters()
 
     def forward(self, x):
-        import ipdb; ipdb.set_trace()
         predictions = self.r2p1d(x)
         return predictions
 
@@ -206,7 +206,6 @@ class Model(pl.LightningModule):
     def train_dataloader(self):
         return self._train_dataloader
 
-
     def val_dataloader(self):
         return self._val_dataloader
 
@@ -233,17 +232,17 @@ if __name__ == "__main__":
     
 
     trainer = pl.Trainer(gpus=-1,
-                        benchmark=True,
                         sync_batchnorm=True,
                         accelerator='ddp',
                         check_val_every_n_epoch=1,
                         progress_bar_refresh_rate=5,
+                        limit_val_batches=0.2,
                         weights_summary='top',
                         max_epochs=10,
                         logger=tb_logger,
                         callbacks=[lr_monitor],
                         profiler="simple",
-                        num_sanity_val_steps=2) 
+                        num_sanity_val_steps=0) 
 
     model = Model(args, world_size=trainer.num_gpus)
 

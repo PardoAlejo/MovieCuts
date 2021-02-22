@@ -13,7 +13,7 @@ class MovieDataset(Dataset):
     def __init__(self,
                  shots_filename,
                  transform=None,
-                 videos_path = '/tmp/youtube',
+                 videos_path = '/tmp/youtube', #'../data/movies/youtube', 
                  num_positives_per_scene=5,
                  negative_positive_ratio=1,
                  across_scene_negs=False,
