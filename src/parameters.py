@@ -18,15 +18,10 @@ def get_params():
                         help="number of frames per clip")
 
 
-    parser.add_argument('--candidates_per_scene', type=int, default=10,
-                        help='Number of candidates per scene')
     parser.add_argument('--negative_positive_ratio_val', type=int, default=5,
                         help='Ratio for negatives:positives for validation')
-    parser.add_argument('--across_scene_negs', action='store_true',
-                        help='Take across scene negatives or not, default same scene')
 
     
-
     # Batch Size and initial learning rates
     parser.add_argument('--num_workers', type=int, default=8,
                         help='Number of workers for data loading')
@@ -44,14 +39,16 @@ def get_params():
                         help='Lr decay')
     parser.add_argument("--weight-decay", default=1e-4, type=float, 
                         help="weight decay (default: 1e-4)")
-    parser.add_argument("--lr-milestones",nargs="+",default=[4, 8],
+    parser.add_argument("--max_epochs", default=20, type=int,
+                        help="Max number of epochs for training")
+    parser.add_argument("--lr-milestones",nargs="+",default=[8, 12, 15],
                         type=int,help="decrease lr on milestones")
     parser.add_argument("--lr-gamma",default=0.1,type=float,
                         help="decrease lr by a factor of lr-gamma")
-    parser.add_argument("--lr-warmup-epochs", default=2, type=int,
+    parser.add_argument("--lr-warmup-epochs", default=1, type=int,
                         help="number of warmup epochs")
 
-    parser.add_argument('--from_scratch', action='store_false',
+    parser.add_argument('--from_scratch', action='store_true',
                         help='Start training from scratct,' 
                         ' starting from K-400 by default')
     parser.add_argument('--model_path', type=str, 
