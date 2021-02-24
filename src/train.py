@@ -45,8 +45,7 @@ def get_transforms(args):
     return transform_train, transform_val
 
 def generate_experiment_name(args):
-    return f'experiment_sample-per-vid-{args.candidates_per_scene}'\
-            f'across_scene_negs-{args.across_scene_negs}'\
+    return f'experiment_'\
             f'_lr-{args.initial_lr}'\
             f'_val-neg-ratio-{args.negative_positive_ratio_val}'\
             f'_batchsize-{args.batch_size}'\
@@ -58,17 +57,13 @@ def get_dataloader(args):
 
     train_dataset = MovieDataset(args.shots_file_name_train, 
                     transform=transforms_train,
-                    num_positives_per_scene=args.candidates_per_scene,
-                    size=(args.scale_w, args.scale_h),
-                    across_scene_negs=args.across_scene_negs)
+                    size=(args.scale_w, args.scale_h))
     print(f'Num samples for train: {len(train_dataset)}')
 
     val_dataset = MovieDataset(args.shots_file_name_val,
                     transform=transforms_val,
-                    num_positives_per_scene=args.candidates_per_scene, 
                     negative_positive_ratio=args.negative_positive_ratio_val,
-                    size=(args.scale_w, args.scale_h),
-                    across_scene_negs=args.across_scene_negs)
+                    size=(args.scale_w, args.scale_h))
 
     print(f'Num samples for val: {len(val_dataset)}')
 
@@ -94,7 +89,8 @@ class Model(pl.LightningModule):
         self.args = args
         self.batch_size = args.batch_size
         self.r2p1d = r2plus1d_18(num_classes=self.args.num_classes)
-        
+        self.r2p1d.stem.requires_grad_(False)
+
         self._train_dataloader, self._val_dataloader = get_dataloader(args)
 
         self.accuracy = pl.metrics.Accuracy()
@@ -102,11 +98,16 @@ class Model(pl.LightningModule):
         self.world_size = world_size
         self.lr = self.args.initial_lr * self.world_size
 
+        self.params = None
         if not self.args.from_scratch:
             self._load_pretrained()
-            self.params = self._set_layers_lr()
+            self._set_layers_lr()
+            #Try removing this shit
+            # self.params = self._set_layers_lr()
+            # self.params = self.r2p1d.parameters()
         else:
-            self.params = self.r2p1d.parameters()
+            pass
+            # self.params = self.r2p1d.parameters()
 
         self.save_hyperparameters()
 
@@ -115,6 +116,7 @@ class Model(pl.LightningModule):
         return predictions
 
     def _load_pretrained(self):
+        
         state = torch.load(self.args.model_path)
         state_dict = self.r2p1d.state_dict()
         for k, v in state.items():
@@ -122,19 +124,18 @@ class Model(pl.LightningModule):
                 continue
             state_dict.update({k: v})
         self.r2p1d.load_state_dict(state_dict)
+        print(f'K-400 weights loaded from: {self.args.model_path}')
 
     def _set_layers_lr(self):
 
-        params = []
-        for name, child in self.r2p1d.named_children():
-            if name == 'stem':
-                this_params = {"params": child.parameters(), "lr": 0}
-            elif name == 'fc':
-                this_params = {"params": child.parameters(), "lr": self.args.fc_lr * args.world_size}
-            else:
-                this_params = {"params": child.parameters(), "lr": self.args.initial_lr * args.world_size}
-            params.append(this_params)
-        return params
+        self.params = [
+            {"params": self.r2p1d.stem.parameters(), "lr": 0},
+            {"params": self.r2p1d.layer1.parameters()},
+            {"params": self.r2p1d.layer2.parameters()},
+            {"params": self.r2p1d.layer3.parameters()},
+            {"params": self.r2p1d.layer4.parameters()},
+            {"params": self.r2p1d.fc.parameters(), "lr": self.lr*10 * self.world_size},
+        ]
 
     def training_step(self, batch, batch_idx):
         (video_chunk, labels) = batch
@@ -149,8 +150,9 @@ class Model(pl.LightningModule):
                     self.accuracy(sigmoid(logits), labels),
                     prog_bar=True, 
                     on_epoch=True, 
-                    on_step=False, 
+                    on_step=True, 
                     logger=True)
+        
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -190,11 +192,13 @@ class Model(pl.LightningModule):
         warmup_iters = self.args.lr_warmup_epochs * len(self._train_dataloader)
         lr_milestones = [len(self._train_dataloader) * m for m in self.args.lr_milestones]
 
-        lr_scheduler = WarmupMultiStepLR(optimizer,
-                                        milestones=lr_milestones,
-                                        gamma=args.lr_gamma,
-                                        warmup_iters=warmup_iters,
-                                        warmup_factor=1e-5)
+        lr_scheduler ={'scheduler': WarmupMultiStepLR(optimizer,
+                                    milestones=lr_milestones,
+                                    gamma=args.lr_gamma,
+                                    warmup_iters=warmup_iters,
+                                    warmup_factor=1e-5),
+                    'name': 'lr'} 
+
         return [optimizer], [lr_scheduler]
 
     def bce_loss(self, logits, labels):
@@ -232,13 +236,11 @@ if __name__ == "__main__":
     
 
     trainer = pl.Trainer(gpus=-1,
-                        sync_batchnorm=True,
                         accelerator='ddp',
                         check_val_every_n_epoch=1,
                         progress_bar_refresh_rate=5,
-                        limit_val_batches=0.2,
                         weights_summary='top',
-                        max_epochs=10,
+                        max_epochs=args.max_epochs,
                         logger=tb_logger,
                         callbacks=[lr_monitor],
                         profiler="simple",
