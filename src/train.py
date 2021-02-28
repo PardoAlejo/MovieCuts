@@ -71,12 +71,14 @@ def get_dataloader(args):
             train_dataset,
             batch_size=args.batch_size,
             num_workers=args.num_workers,
+            pin_memory=True,
             shuffle=False)
 
     val_dataloader = DataLoader(
             val_dataset,
             batch_size=args.batch_size,
             num_workers=args.num_workers,
+            pin_memory=True,
             shuffle=False)
 
     return train_dataloader, val_dataloader
@@ -134,7 +136,7 @@ class Model(pl.LightningModule):
             {"params": self.r2p1d.layer2.parameters()},
             {"params": self.r2p1d.layer3.parameters()},
             {"params": self.r2p1d.layer4.parameters()},
-            {"params": self.r2p1d.fc.parameters(), "lr": self.lr*10 * self.world_size},
+            {"params": self.r2p1d.fc.parameters(), "lr": self.lr*10},
         ]
 
     def training_step(self, batch, batch_idx):
@@ -238,7 +240,7 @@ if __name__ == "__main__":
     trainer = pl.Trainer(gpus=-1,
                         accelerator='ddp',
                         check_val_every_n_epoch=1,
-                        progress_bar_refresh_rate=5,
+                        progress_bar_refresh_rate=1,
                         weights_summary='top',
                         max_epochs=args.max_epochs,
                         logger=tb_logger,
@@ -246,6 +248,7 @@ if __name__ == "__main__":
                         profiler="simple",
                         num_sanity_val_steps=0) 
 
+    print(f"Using {trainer.num_gpus} gpus")
     model = Model(args, world_size=trainer.num_gpus)
 
     if args.test:

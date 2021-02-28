@@ -4,9 +4,9 @@ import argparse
 def get_params():
     parser = argparse.ArgumentParser(description='Easy video feature extractor')
         
-    parser.add_argument('--shots_file_name_train', type=str, default='../data/used_cuts_train.csv',
+    parser.add_argument('--shots_file_name_train', type=str, default='data/used_cuts_train.csv',
                         help='Shots for training')
-    parser.add_argument('--shots_file_name_val', type=str, default='../data/used_cuts_val.csv',
+    parser.add_argument('--shots_file_name_val', type=str, default='data/used_cuts_val.csv',
                         help='Shots for validation')
 
     # Reading arguments
@@ -41,9 +41,9 @@ def get_params():
                         help="weight decay (default: 1e-4)")
     parser.add_argument("--max_epochs", default=20, type=int,
                         help="Max number of epochs for training")
-    parser.add_argument("--lr-milestones",nargs="+",default=[8, 12, 15],
+    parser.add_argument("--lr-milestones",nargs="+",default=[8, 12, 16],
                         type=int,help="decrease lr on milestones")
-    parser.add_argument("--lr-gamma",default=0.1,type=float,
+    parser.add_argument("--lr-gamma",default=0.5,type=float,
                         help="decrease lr by a factor of lr-gamma")
     parser.add_argument("--lr-warmup-epochs", default=1, type=int,
                         help="number of warmup epochs")
@@ -52,13 +52,13 @@ def get_params():
                         help='Start training from scratct,' 
                         ' starting from K-400 by default')
     parser.add_argument('--model_path', type=str, 
-                        default='../models/r2plus1d_18-91a641e6.pth',
+                        default='models/r2plus1d_18-91a641e6.pth',
                         help='pretrained K400 model path')
     parser.add_argument('--num_classes', type=int, default=1,
                         help='Number of classes')
     parser.add_argument('--seed', type=int, default=4165,
                         help='Number of classes')
-    parser.add_argument('--experiments_dir', type=str, default='../experiments',
+    parser.add_argument('--experiments_dir', type=str, default='experiments',
                         help='Number of classes')
 
     # Test or load checkpoint

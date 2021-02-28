@@ -10,19 +10,12 @@
 #SBATCH --account conf-iccv-2021.03.25-ghanembs
 
 echo `hostname`
+# LRs=(0.01 0.001 0.03 0.003)
+# DEVICES=(0,1 2,3 4,5 6,7)
 
-echo copying data
-
-tar -C /tmp -zxf /home/pardogl/scratch/data/movies/archived-movies.tar.gz
-
-source activate torch1.3
-cd ../src
-python train.py --shots_file_name_train ../data/used_cuts_train_movies.csv \
-                --shots_file_name_val ../data/used_cuts_val_movies.csv \
-                --num_workers 10 \
-                --batch_size 32 \
-                --initial_lr 0.001 \
-                --fc_lr 0.01 \
-                --negative_positive_ratio_val 1 \
-                --across_scene_negs \
-                
+python src/train.py --shots_file_name_train data/used_cuts_train_movies.csv \
+                --shots_file_name_val data/used_cuts_val_movies.csv \
+                --num_workers 3 \
+                --batch_size 20 \
+                --initial_lr 0.005 \
+                --negative_positive_ratio_val 1

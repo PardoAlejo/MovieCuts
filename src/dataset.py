@@ -6,6 +6,7 @@ import numpy as np
 import ffmpeg
 import tqdm
 from torchvision.io import read_video, write_video
+import json
 
 class MovieDataset(Dataset):
     """Construct an untrimmed video classification dataset."""
@@ -13,7 +14,8 @@ class MovieDataset(Dataset):
     def __init__(self,
                  shots_filename,
                  transform=None,
-                 videos_path = '/tmp/youtube', #'../data/movies/youtube', 
+                 videos_path = 'data/youtube',
+                 cache_path = './.cache',
                  negative_positive_ratio=1,
                  augment_temporal_shift=True,
                  pos_delta_range=list(range(5)),
@@ -21,12 +23,13 @@ class MovieDataset(Dataset):
                  original_fps=24,
                  network_fps=15,   
                  size=(112, 112),
-                 seed=424242):
+                 seed=4165):
     
         self.shots_df = pd.read_csv(shots_filename)
         self.shots_df_by_video_id = self.shots_df.groupby('video_id')
         self.shots_df_by_movie_id = self.shots_df.groupby('movie_id')
         self.videos_path = videos_path
+        self.cache_path = cache_path
 
         self.transform = transform
 
@@ -43,7 +46,15 @@ class MovieDataset(Dataset):
         self.pos_delta_range = pos_delta_range
 
         self.candidates = None
-        self.set_candidates()
+        
+        shot_file_base_name = os.path.basename(shots_filename).replace('.csv','')
+        self.cache_filename = f'{self.cache_path}/{shot_file_base_name}_np-ratio_{self.negative_positive_ratio}_seed_{self.seed}.json'
+
+        if not os.path.exists(self.cache_filename):
+            self.set_candidates()
+        else:
+            print(f'Cache file found at: {self.cache_filename}')
+            self.read_cache_candidates()
 
     def get_average_shots_per_scene(self):
         num_shots = 0
@@ -133,6 +144,12 @@ class MovieDataset(Dataset):
             
         return clip[:,idxs,:,:], label
 
+    def read_cache_candidates(self):
+        dict_cache = json.load(open(self.cache_filename))
+        self.candidates = dict_cache['candidates']
+        self.labels = dict_cache['labels']
+        print('Candidates readed from cache file')
+
     def set_candidates(self):
         print(f'Setting candidates for {self.mode}')
         self.candidates = []
@@ -164,3 +181,12 @@ class MovieDataset(Dataset):
                 this_labels.append(0)
             self.candidates.extend(this_candidates)
             self.labels.extend(this_labels)
+
+        if not os.path.exists(self.cache_path):
+            os.makedirs(self.cache_path)
+
+        print(f'Saving cache candidates file in: {self.cache_filename}')
+        cache = {'candidates':self.candidates, 'labels':self.labels}
+        with open(self.cache_filename, 'w') as f:
+            json.dump(cache, f)
+
