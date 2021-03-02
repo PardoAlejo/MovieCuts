@@ -3,7 +3,9 @@ from torch.utils.data import Dataset
 import pandas as pd
 import os
 import numpy as np
+import random
 import ffmpeg
+from PIL import Image
 import tqdm
 from torchvision.io import read_video, write_video
 import json
@@ -14,11 +16,12 @@ class MovieDataset(Dataset):
     def __init__(self,
                  shots_filename,
                  transform=None,
-                 videos_path = 'data/youtube',
+                 videos_path = 'data/framed_clips',
                  cache_path = './.cache',
                  negative_positive_ratio=1,
                  augment_temporal_shift=True,
                  pos_delta_range=list(range(5)),
+                 augment_spatial_flip=True,
                  snippet_size=16,
                  original_fps=24,
                  network_fps=15,   
@@ -42,10 +45,12 @@ class MovieDataset(Dataset):
         self.seed = seed
         self.negative_positive_ratio = negative_positive_ratio
 
+        self.augment_spatial_flip = augment_spatial_flip
         self.augment_temporal_shift = augment_temporal_shift
         self.pos_delta_range = pos_delta_range
 
         self.candidates = None
+        self.clips_to_fps = dict(zip(self.shots_df.clip_id.tolist(),self.shots_df.fps.tolist()))
         
         shot_file_base_name = os.path.basename(shots_filename).replace('.csv','')
         self.cache_filename = f'{self.cache_path}/{shot_file_base_name}_np-ratio_{self.negative_positive_ratio}_seed_{self.seed}.json'
@@ -80,7 +85,7 @@ class MovieDataset(Dataset):
         clip = torch.from_numpy(clip.astype('uint8'))
 
         return clip
-
+    
     def get_clip_pytorch(self, video_path, start_time, time_span):
     
         clip, _, info  = read_video(video_path, start_pts=start_time, end_pts=start_time+time_span, pts_unit='sec')
@@ -88,6 +93,30 @@ class MovieDataset(Dataset):
         fps = info['video_fps']
         
         return clip
+
+
+    def get_clip_from_frames(self, clip_path, start_time, time_span, fps):
+        """
+        clip_path path to clip frames
+        """
+        
+        start_frame = int(start_time*fps)
+        vframes = int(np.ceil(time_span*fps))
+
+        filenames = [f'{clip_path}/frames/{i:06d}.jpg' for i in range(start_frame, start_frame+vframes, 1)]
+        frames = []
+        for f in filenames:
+            img = Image.open(f)
+            img = img.convert('RGB')
+            frames.append(img)
+            
+        if (self.augment_spatial_flip) & (bool(random.getrandbits(1))):
+            frames = [img.transpose(Image.FLIP_LEFT_RIGHT) for img in frames]
+
+        frames = [torch.from_numpy(np.asarray(img).copy()) for img in frames]
+        frames = torch.stack(frames, 0)
+
+        return frames
 
     def __len__(self):
         return (len(self.candidates))
@@ -105,40 +134,43 @@ class MovieDataset(Dataset):
         return idxs
 
     def __getitem__(self, idx):
-        video_path = f'{self.videos_path}/{self.candidates[idx][0]}/{self.candidates[idx][0]}.mp4'
         
         if self.augment_temporal_shift:
             pos_delta = np.random.choice(self.pos_delta_range)
         else:
             pos_delta = 0 # exact cut -- left/right shots see same  # frames.
 
-        left_duration = self.time_span*0.5 - pos_delta/self.original_fps
-        start_time = self.candidates[idx][2] - left_duration
-
-        right_duration = self.time_span*0.5 + pos_delta/self.original_fps
-        end_time = self.candidates[idx][3] + right_duration
-        
         label = self.labels[idx]
-        
-        if os.path.isfile(video_path):
+                    
+        if label == 1:
+            clip_name = self.candidates[idx][0]
+            fps = self.clips_to_fps[clip_name]
+            left_duration = self.time_span*0.5 + pos_delta/fps
+            start_time = self.candidates[idx][2] - left_duration
+            clip_path = f'{self.videos_path}/{clip_name}'
+            clip = self.get_clip_from_frames(clip_path, start_time, self.time_span, fps)
+            idxs = self.resample_video_idx(self.snippet_size, fps, self.network_fps)
+
+        if label == 0:
+            clip_name_left = self.candidates[idx][0]
+            fps_left = self.clips_to_fps[clip_name_left]
+            left_duration = self.time_span*0.5 + pos_delta/fps_left
+            start_time = self.candidates[idx][2] - left_duration
+            clip_path = f'{self.videos_path}/{clip_name_left}'
+            clip_left = self.get_clip_from_frames(clip_path, start_time, left_duration, fps_left)
+
+            clip_name_right = self.candidates[idx][3]
+            fps_right = self.clips_to_fps[clip_name_right]
+            right_duration = self.time_span*0.5 - pos_delta/fps_right
+            end_time = self.candidates[idx][4]
+            clip_path = f'{self.videos_path}/{clip_name_right}'
+            clip_right = self.get_clip_from_frames(clip_path, end_time, right_duration, fps_right)
             
-            if label == 1:
+            clip = torch.cat((clip_left, clip_right), dim=0)
 
-                clip = self.get_clip_ffmpeg(video_path, start_time, time_span=self.time_span)
+            idxs = self.resample_video_idx(self.snippet_size, fps_left, self.network_fps)
 
-            if label == 0:
-                clip_left = self.get_clip_ffmpeg(video_path, start_time, time_span=left_duration)
-                clip_right = self.get_clip_ffmpeg(video_path, end_time, time_span=right_duration)
-
-                clip = torch.cat((clip_left, clip_right), dim=0)
-                 
-                
-        else:
-            print(f'{video_path} video does not exist')
-            clip = torch.zeros(1)
-
-        idxs = self.resample_video_idx(self.snippet_size, self.original_fps, self.network_fps)
-        # write_video(f'examples_ffmpeg/{label}/{self.candidates[idx][0]}.mp4',clip[idxs,:,:,:],self.network_fps)
+        # write_video(f'examples/{label}/{self.candidates[idx][0]}.mp4',clip[idxs,:,1:,:],self.network_fps)
         if self.transform:
             clip = self.transform(clip)
             
@@ -157,26 +189,43 @@ class MovieDataset(Dataset):
         for idx, row in tqdm.tqdm(self.shots_df.iterrows(),total=len(self.shots_df)):
             this_candidates = []
             this_labels = []
-            
-            # Find positive candidates
             df = self.shots_df[self.shots_df.video_id==row.video_id]
-            this_candidates.append(df.sample().values.tolist()[0])
+            # Find positive candidates
+            if not (row.shot_left_end - row.shot_left_start > 0.8) and (row.shot_right_end- row.shot_right_start > 0.8):
+                continue
+
+            cut_time = (row.shot_left_end + row.shot_right_start)/2
+            positive = [row.clip_id, row.shot_left_start, cut_time, row.clip_id, cut_time, row.shot_right_end]
+            # Center around zero since annotations come from original scenes
+            positive = [x-row.shot_left_start if type(x)!=str else x for x in positive]
+            this_candidates.append(positive)
             this_labels.append(1)
             # Find negative candidates
             for i in range(self.negative_positive_ratio):  
                 left_found = False
                 while not left_found:
-                    left = df.sample().values.tolist()[0]
-                    if left[2] - left[1] > 1:
-                        negative = left[0:3]
+                    left = df.sample().iloc[0]
+                    if left.shot_left_end - left.shot_left_start > 0.8:
+                        cut_time = (left.shot_left_end + left.shot_right_start)/2
+                        negative_left = [left.clip_id, left.shot_left_start, cut_time]
+                        # Center around zero since annotations come from original scenes
+                        negative = [x-left.shot_left_start if type(x)!=str else x for x in negative_left]
                         left_found = True
                 right_found = False
                 while not right_found:
-                    right = df.sample().values.tolist()[0]
-                    if right[2] - right[1] > 1:
-                        negative.extend(right[1:3])
+                    right = df.sample().iloc[0]
+                    # sample a different candidate than left
+                    # in case of one shot just allow to repeat
+                    if right.clip_id == left.clip_id and len(df)>1:
+                        continue
+                    if right.shot_left_end - right.shot_left_start > 0.8:
+                        cut_time = (right.shot_left_end + right.shot_right_start)/2
+                        negative_right = [right.clip_id, right.shot_left_start, cut_time]
+                        # Center around zero since annotations come from original scenes
+                        # create the full negative
+                        negative.extend([x-right.shot_left_start if type(x)!=str else x for x in negative_right])
                         right_found = True
-                negative.extend(right[5:])
+                # Center around zero since annotations come from original scenes
                 this_candidates.append(negative)
                 this_labels.append(0)
             self.candidates.extend(this_candidates)
