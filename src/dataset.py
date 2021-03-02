@@ -142,6 +142,30 @@ class MovieDataset(Dataset):
 
         return frames
 
+
+    def get_clip_from_frames(self, clip_path, start_time, time_span, fps):
+        """
+        clip_path path to clip frames
+        """
+        
+        start_frame = int(start_time*fps)
+        vframes = int(np.ceil(time_span*fps))
+
+        filenames = [f'{clip_path}/frames/{i:06d}.jpg' for i in range(start_frame, start_frame+vframes, 1)]
+        frames = []
+        for f in filenames:
+            img = Image.open(f)
+            img = img.convert('RGB')
+            frames.append(img)
+            
+        if (self.augment_spatial_flip) & (bool(random.getrandbits(1))):
+            frames = [img.transpose(Image.FLIP_LEFT_RIGHT) for img in frames]
+
+        frames = [torch.from_numpy(np.asarray(img).copy()) for img in frames]
+        frames = torch.stack(frames, 0)
+
+        return frames
+
     def __len__(self):
         return (len(self.candidates))
     
