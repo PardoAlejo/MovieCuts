@@ -3,12 +3,17 @@ import argparse
 
 def get_params():
     parser = argparse.ArgumentParser(description='Easy video feature extractor')
-        
+
+    parser.add_argument('--video_stream', action='store_true',
+                        help='Turn on video stream')
+    parser.add_argument('--audio_stream', action='store_true',
+                        help='Turn on video stream')
+
     parser.add_argument('--shots_file_name_train', type=str, default='data/used_cuts_train.csv',
                         help='Shots for training')
     parser.add_argument('--shots_file_name_val', type=str, default='data/used_cuts_val.csv',
                         help='Shots for validation')
-
+    
     # Reading arguments
     parser.add_argument("--scale_h", default=128, type=int,
                         help="Scale H to read")
@@ -51,8 +56,11 @@ def get_params():
     parser.add_argument('--from_scratch', action='store_true',
                         help='Start training from scratct,' 
                         ' starting from K-400 by default')
-    parser.add_argument('--model_path', type=str, 
+    parser.add_argument('--video_model_path', type=str, 
                         default='models/r2plus1d_18-91a641e6.pth',
+                        help='pretrained K400 model path')
+    parser.add_argument('--audio_model_path', type=str, 
+                        default='models/vggsound_avgpool.pth.tar',
                         help='pretrained K400 model path')
     parser.add_argument('--num_classes', type=int, default=1,
                         help='Number of classes')

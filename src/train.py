@@ -5,6 +5,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.nn import functional as F
 import torchvision
 from torchvision.models.video import r2plus1d_18
+from audio_model import AVENet
 from dataset import MovieDataset
 from torch.utils.data import DataLoader
 from pytorch_lightning import loggers as pl_loggers
@@ -18,7 +19,6 @@ from torchvision.io import write_video
 
 def sigmoid(X):
     return 1/(1+torch.exp(-X.squeeze()))
-
 
 def get_transforms(args):
     
@@ -55,12 +55,16 @@ def get_dataloader(args):
     
     transforms_train, transforms_val = get_transforms(args)
 
-    train_dataset = MovieDataset(args.shots_file_name_train, 
+    train_dataset = MovieDataset(args.shots_file_name_train,
+                    visual_stream=args.video_stream,
+                    audio_stream=args.audio_stream,
                     transform=transforms_train,
                     size=(args.scale_w, args.scale_h))
     print(f'Num samples for train: {len(train_dataset)}')
 
     val_dataset = MovieDataset(args.shots_file_name_val,
+                    visual_stream=args.video_stream,
+                    audio_stream=args.audio_stream,
                     transform=transforms_val,
                     negative_positive_ratio=args.negative_positive_ratio_val,
                     size=(args.scale_w, args.scale_h))
@@ -89,47 +93,71 @@ class Model(pl.LightningModule):
     def __init__(self, args, world_size):
         super().__init__()
         self.args = args
-        self.batch_size = args.batch_size
-        self.r2p1d = r2plus1d_18(num_classes=self.args.num_classes)
-        self.r2p1d.stem.requires_grad_(False)
+        self.batch_size = self.args.batch_size
 
-        self._train_dataloader, self._val_dataloader = get_dataloader(args)
-
-        self.accuracy = pl.metrics.Accuracy()
+        self.params = None
         
         self.world_size = world_size
         self.lr = self.args.initial_lr * self.world_size
 
-        self.params = None
-        if not self.args.from_scratch:
-            self._load_pretrained()
-            self._set_layers_lr()
-            #Try removing this shit
-            # self.params = self._set_layers_lr()
-            # self.params = self.r2p1d.parameters()
-        else:
-            pass
-            # self.params = self.r2p1d.parameters()
+        if self.args.video_stream:
+            self.r2p1d = r2plus1d_18(num_classes=self.args.num_classes)
+            self.r2p1d.stem.requires_grad_(False)
+            if not self.args.from_scratch:
+                self._load_pretrained(stream='visual')
+                self._set_layers_params_video()
+            else:
+                # TODO: Implement loading params from scratch
+                pass
+                # self.params = self.r2p1d.parameters()
+
+        if self.args.audio_stream:
+
+            self.resnet18 = AVENet(model_depth=18, n_classes=self.args.num_classes)
+            if not self.args.from_scratch:
+                self._load_pretrained()
+                self._set_layers_params_audio()
+            else:
+                # TODO: Implement loading params from scratch
+                pass        
+
+        self._train_dataloader, self._val_dataloader = get_dataloader(args)
+
+        self.accuracy = pl.metrics.Accuracy()
 
         self.save_hyperparameters()
 
     def forward(self, x):
-        predictions = self.r2p1d(x)
+        if self.args.video_stream:
+            predictions = self.r2p1d(x)
+        if self.args.audio_stream:
+            self.sound_stream(x)
         return predictions
 
-    def _load_pretrained(self):
+    def _load_pretrained(self, stream='visual'):
         
-        state = torch.load(self.args.model_path)
-        state_dict = self.r2p1d.state_dict()
+        if self.args.video_stream:
+            state = torch.load(self.args.video_model_path)
+            state_dict = self.r2p1d.state_dict()
+            model = self.r2p1d
+            print(f'Loading weights from from: {self.args.video_model_path}')
+        elif self.args.audio_stream:
+            state = torch.load(self.args.audio_model_path)['model_state_dict']
+            state_dict = self.resnet18.state_dict()
+            model = self.resnet18
+            print(f'Loading weights from from: {self.args.audio_model_path}')
+
         for k, v in state.items():
             if 'fc' in k:
                 continue
             state_dict.update({k: v})
-        self.r2p1d.load_state_dict(state_dict)
-        print(f'K-400 weights loaded from: {self.args.model_path}')
+        model.load_state_dict(state_dict)
+        
 
-    def _set_layers_lr(self):
+    def _set_layers_params_audio(self):
+        self.params = self.resnet18.parameters()
 
+    def _set_layers_params_video(self):
         self.params = [
             {"params": self.r2p1d.stem.parameters(), "lr": 0},
             {"params": self.r2p1d.layer1.parameters()},
@@ -140,9 +168,16 @@ class Model(pl.LightningModule):
         ]
 
     def training_step(self, batch, batch_idx):
-        (video_chunk, labels) = batch
-        logits = self.r2p1d(video_chunk)
-        loss = self.bce_loss(logits, labels)
+
+        if self.args.video_stream:
+            (video_chunk, labels) = batch
+            logits = self.r2p1d(video_chunk)
+            loss = self.bce_loss(logits, labels)
+        if self.args.audio_stream:
+            (audio_chunk, labels) = batch
+            logits = self.resnet18(audio_chunk)
+            loss = self.bce_loss(logits, labels)
+        
         self.log('Traning_loss', loss, 
                     on_step=True, 
                     on_epoch=True, 
@@ -158,9 +193,16 @@ class Model(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        (video_chunk, labels) = batch
-        logits = self.r2p1d(video_chunk)
-        loss = self.bce_loss(logits, labels)
+
+        if self.args.video_stream:
+            (video_chunk, labels) = batch
+            logits = self.r2p1d(video_chunk)
+            loss = self.bce_loss(logits, labels)
+        if self.args.audio_stream:
+            (audio_chunk, labels) = batch
+            logits = self.resnet18(audio_chunk)
+            loss = self.bce_loss(logits, labels)
+
         self.log('Validation_loss', 
                 loss, 
                 prog_bar=True, 
@@ -172,9 +214,16 @@ class Model(pl.LightningModule):
                 logger=True)
     
     def test_step(self, batch, batch_idx):
-        (video_chunk, labels) = batch
-        logits = self.r2p1d(video_chunk)
-        loss = self.bce_loss(logits, labels)
+
+        if self.args.video_stream:
+            (video_chunk, labels) = batch
+            logits = self.r2p1d(video_chunk)
+            loss = self.bce_loss(logits, labels)
+        if self.args.audio_stream:
+            (audio_chunk, labels) = batch
+            logits = self.resnet18(audio_chunk)
+            loss = self.bce_loss(logits, labels)
+
         self.log('Test_loss', 
                 loss, 
                 prog_bar=True, 
@@ -196,9 +245,9 @@ class Model(pl.LightningModule):
 
         lr_scheduler ={'scheduler': WarmupMultiStepLR(optimizer,
                                     milestones=lr_milestones,
-                                    gamma=args.lr_gamma,
+                                    gamma=self.args.lr_gamma,
                                     warmup_iters=warmup_iters,
-                                    warmup_factor=1e-5),
+                                    warmup_factor=0.5),
                     'name': 'lr'} 
 
         return [optimizer], [lr_scheduler]
