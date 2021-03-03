@@ -4,7 +4,7 @@ import argparse
 def get_params():
     parser = argparse.ArgumentParser(description='Easy video feature extractor')
 
-    parser.add_argument('--video_stream', action='store_true',
+    parser.add_argument('--visual_stream', action='store_true',
                         help='Turn on video stream')
     parser.add_argument('--audio_stream', action='store_true',
                         help='Turn on video stream')
@@ -21,7 +21,8 @@ def get_params():
                         help="Scale H to read")
     parser.add_argument("--crop_size", default=112, type=int, 
                         help="number of frames per clip")
-
+    parser.add_argument("--snippet_size", default=16, type=int, 
+                        help="number of frames per clip")
 
     parser.add_argument('--negative_positive_ratio_val', type=int, default=5,
                         help='Ratio for negatives:positives for validation')
@@ -34,8 +35,6 @@ def get_params():
                         help='batch size')
     parser.add_argument("--initial_lr", default=0.001, type=float, 
                         help="initial learning rate")
-    parser.add_argument("--fc_lr", default=0.001, type=float, 
-                        help="fully connected learning rate")
 
     # Scheduler parameters
     parser.add_argument("--momentum", default=0.9, type=float,

@@ -19,4 +19,4 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 python src/train.py --shots_file_name_train data/an
                 --batch_size 24 \
                 --initial_lr 0.003 \
                 --negative_positive_ratio_val 1 \
-                --video_stream
+                --visual_stream

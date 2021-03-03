@@ -95,14 +95,28 @@ class MovieDataset(Dataset):
 
         return clip
     
-    def get_clip_audio(self, clip_path, start_time, time_span):
+    def get_clip_audio(self, clip_path, start_time, time_span, left=True, right=True):
         clip_name = os.path.basename(clip_path)
         audio_path = f'{clip_path}/{clip_name}.wav'
         data, samplerate = sf.read(audio_path)
         start_sample = int(start_time*samplerate)
-        end_sample = start_sample + int(time_span*samplerate)
-
-        audio = data[start_sample:end_sample]
+        start_sample_0 = max(0,start_sample)
+        span = int(time_span*samplerate)
+        num_neg_frames = start_sample_0 - start_sample
+        end_sample = start_sample + span
+        
+        audio = data[start_sample_0:end_sample]
+        if len(audio) < (span):
+            pad_ratio = span - len(audio)
+            if left and not right:
+                audio = np.pad(audio,(pad_ratio,0),constant_values=audio[0])
+            elif right and not left:
+                audio = np.pad(audio,(0,pad_ratio),constant_values=audio[-1])
+            elif right and left:
+                if pad_ratio == 1:
+                    audio = np.pad(audio,(pad_ratio,0),constant_values=audio[0])
+                else:
+                    audio = np.pad(audio,(int(pad_ratio/2),int(pad_ratio/2)),constant_values=(audio[0], audio[-1]))
         return audio, samplerate
 
     def get_clip_spectogram(self, audio, samplerate, name=None):
@@ -119,40 +133,36 @@ class MovieDataset(Dataset):
             plt.savefig(name)
         return torch.from_numpy(spectrogram)
 
-    def get_clip_from_frames(self, clip_path, start_time, time_span, fps):
+
+    def get_clip_from_frames(self, clip_path, start_time, time_span, fps, left=True, right=True):
         """
         clip_path path to clip frames
         """
         
         start_frame = int(start_time*fps)
         vframes = int(np.ceil(time_span*fps))
-
-        filenames = [f'{clip_path}/frames/{i:06d}.jpg' for i in range(start_frame, start_frame+vframes, 1)]
-        frames = []
-        for f in filenames:
-            img = Image.open(f)
-            img = img.convert('RGB')
-            frames.append(img)
-            
-        if (self.augment_spatial_flip) & (bool(random.getrandbits(1))):
-            frames = [img.transpose(Image.FLIP_LEFT_RIGHT) for img in frames]
-
-        frames = [torch.from_numpy(np.asarray(img).copy()) for img in frames]
-        frames = torch.stack(frames, 0)
-
-        return frames
-
-
-    def get_clip_from_frames(self, clip_path, start_time, time_span, fps):
-        """
-        clip_path path to clip frames
-        """
+        start_frame_0 = max(0,start_frame)
+        num_neg_frames = start_frame_0 - start_frame
         
-        start_frame = int(start_time*fps)
-        vframes = int(np.ceil(time_span*fps))
-
-        filenames = [f'{clip_path}/frames/{i:06d}.jpg' for i in range(start_frame, start_frame+vframes, 1)]
+        filenames = [f'{clip_path}/frames/{i:06d}.jpg' for i in range(start_frame_0, start_frame_0+(vframes-num_neg_frames), 1)]
+        # filenames = [f'{clip_path}/frames/{i:06d}.jpg' for i in range(start_frame, start_frame+vframes, 1)]
         frames = []
+
+
+        if len(filenames) < (vframes):
+            if left and not right:
+                pad_ratio = vframes - len(filenames)
+                filenames = [filenames[0]] * pad_ratio  + filenames
+            elif right and not left:
+                pad_ratio = vframes - len(filenames)
+                filenames = filenames + [filenames[-1]] * pad_ratio
+            elif right and left:
+                pad_ratio = vframes - len(filenames)
+                if pad_ratio == 1: 
+                    filenames = [filenames[0]] * pad_ratio + filenames
+                else:
+                    filenames = [filenames[0]] * int(pad_ratio/2) + filenames + [filenames[-1]] * int(pad_ratio/2)
+
         for f in filenames:
             img = Image.open(f)
             img = img.convert('RGB')
@@ -217,31 +227,31 @@ class MovieDataset(Dataset):
             end_time = self.candidates[idx][4]
 
             if self.visual_stream:
-                clip_left = self.get_clip_from_frames(clip_path_left, start_time, left_duration, fps_left)
-                clip_right = self.get_clip_from_frames(clip_path_right, end_time, right_duration, fps_right)
+                clip_left = self.get_clip_from_frames(clip_path_left, start_time, left_duration, fps_left, right=False)
+                clip_right = self.get_clip_from_frames(clip_path_right, end_time, right_duration, fps_right, left=False)
 
                 clip = torch.cat((clip_left, clip_right), dim=0)
                 idxs = self.resample_video_idx(self.snippet_size, fps_left, self.network_fps)
 
             if self.audio_stream:
-                audio_left, rate = self.get_clip_audio(clip_path_left, start_time, left_duration)
-                audio_right, _ = self.get_clip_audio(clip_path_right, end_time, right_duration)
+                audio_left, rate = self.get_clip_audio(clip_path_left, start_time, left_duration, right=False)
+                audio_right, _ = self.get_clip_audio(clip_path_right, end_time, right_duration, left=False)
                 audio  = np.concatenate((audio_left, audio_right), axis=0)
                 spectogram = self.get_clip_spectogram(audio, rate)
-
+            clip_name = clip_name_left
         # write_video(f'examples/{label}/{self.candidates[idx][0]}.mp4',clip[idxs,:,1:,:],self.network_fps)
         if self.transform and self.visual_stream:
             clip = self.transform(clip)
         
 
         if self.visual_stream and not self.audio_stream:
-            return clip[:,idxs,:,:], label
+            return clip[:,idxs,:,:], label, clip_name
         
         elif not self.visual_stream and self.audio_stream:
-            return spectogram.unsqueeze(0).float(), label
+            return spectogram.unsqueeze(0).float(), label, clip_name
         
         elif self.visual_stream and self.audio_stream:
-            return clip[:,idxs,:,:], spectogram.unsqueeze(0).float(), label
+            return clip[:,idxs,:,:], spectogram.unsqueeze(0).float(), label, clip_name
 
 
     def read_cache_candidates(self):

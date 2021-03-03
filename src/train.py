@@ -20,6 +20,7 @@ import transforms as T
 from scheduler import WarmupMultiStepLR
 from parameters import get_params
 from torchvision.io import write_video
+import json
 
 def sigmoid(X):
     return 1/(1+torch.exp(-X.squeeze()))
@@ -52,6 +53,7 @@ def generate_experiment_name(args):
     return f'experiment_'\
             f'_audio_{args.audio_stream}'\
             f'_visual_{args.visual_stream}'\
+            f'_snippet_{args.snippet_size}'\
             f'_lr-{args.initial_lr}'\
             f'_val-neg-ratio-{args.negative_positive_ratio_val}'\
             f'_batchsize-{args.batch_size}'\
@@ -62,15 +64,17 @@ def get_dataloader(args):
     transforms_train, transforms_val = get_transforms(args)
 
     train_dataset = MovieDataset(args.shots_file_name_train,
-                    visual_stream=args.video_stream,
+                    visual_stream=args.visual_stream,
                     audio_stream=args.audio_stream,
+                    snippet_size=args.snippet_size,
                     transform=transforms_train,
                     size=(args.scale_w, args.scale_h))
     print(f'Num samples for train: {len(train_dataset)}')
 
     val_dataset = MovieDataset(args.shots_file_name_val,
-                    visual_stream=args.video_stream,
+                    visual_stream=args.visual_stream,
                     audio_stream=args.audio_stream,
+                    snippet_size=args.snippet_size,
                     transform=transforms_val,
                     negative_positive_ratio=args.negative_positive_ratio_val,
                     size=(args.scale_w, args.scale_h))
@@ -106,36 +110,29 @@ class Model(pl.LightningModule):
         self.world_size = world_size
         self.lr = self.args.initial_lr * self.world_size
 
-        if self.args.video_stream and not self.args.audio_stream:
+        if self.args.visual_stream and not self.args.audio_stream:
 
             self.r2p1d = r2plus1d_18(num_classes=self.args.num_classes)
             self.r2p1d.stem.requires_grad_(False)
             if not self.args.from_scratch:
                 self._load_pretrained(stream='visual')
-                self._set_layers_params_video()
-            else:
-                # TODO: Implement loading params from scratch
-                pass
-                # self.params = self.r2p1d.parameters()
+            self._set_layers_params_video()
+            
 
-        if not self.args.video_stream and self.args.audio_stream:
+        if not self.args.visual_stream and self.args.audio_stream:
 
             self.resnet18 = AVENet(model_depth=18, num_classes=self.args.num_classes)
             if not self.args.from_scratch:
                 self._load_pretrained()
-                self._set_layers_params_audio()
-            else:
-                # TODO: Implement loading params from scratch
-                pass       
+            self._set_layers_params_audio()
+                   
         
-        if self.args.video_stream and self.args.audio_stream:
+        if self.args.visual_stream and self.args.audio_stream:
             self.audio_visual_network = AudioVisualModel(num_classes=self.args.num_classes, mlp=True)
             if not self.args.from_scratch:
                 self._load_pretrained()
-                self._set_layers_params_multi()
-            else:
-                # TODO: Implement loading params from scratch
-                pass 
+            self._set_layers_params_multi()
+             
 
         self._train_dataloader, self._val_dataloader = get_dataloader(args)
 
@@ -144,17 +141,17 @@ class Model(pl.LightningModule):
         self.save_hyperparameters()
 
     def forward(self, x):
-        if self.args.video_stream and not self.args.audio_stream:
+        if self.args.visual_stream and not self.args.audio_stream:
             predictions = self.r2p1d(x)
-        elif not args.video_stream and self.args.audio_stream:
+        elif not args.visual_stream and self.args.audio_stream:
             self.resnet18(x)
-        elif args.video_stream and self.args.audio_stream:
+        elif args.visual_stream and self.args.audio_stream:
             pass
         return predictions
 
     def _load_pretrained(self, stream='visual'):
         
-        if self.args.video_stream and not self.args.audio_stream:
+        if self.args.visual_stream and not self.args.audio_stream:
             state = torch.load(self.args.video_model_path)
             state_dict = self.r2p1d.state_dict()
 
@@ -166,7 +163,7 @@ class Model(pl.LightningModule):
 
             print(f'Loaded visual weights from: {self.args.video_model_path}')
 
-        elif self.args.audio_stream and not self.args.video_stream:
+        elif self.args.audio_stream and not self.args.visual_stream:
             state = torch.load(self.args.audio_model_path)['model_state_dict']
             state_dict = self.resnet18.state_dict()
             
@@ -178,7 +175,7 @@ class Model(pl.LightningModule):
         
             print(f'Loaded audio weights from: {self.args.audio_model_path}')
 
-        elif self.args.audio_stream and self.args.video_stream:
+        elif self.args.audio_stream and self.args.visual_stream:
             state_visual = torch.load(self.args.video_model_path)
             state_audio = torch.load(self.args.audio_model_path)['model_state_dict']
             state_dict = self.audio_visual_network.state_dict()
@@ -208,21 +205,21 @@ class Model(pl.LightningModule):
             {"params": self.r2p1d.layer2.parameters()},
             {"params": self.r2p1d.layer3.parameters()},
             {"params": self.r2p1d.layer4.parameters()},
-            {"params": self.r2p1d.fc.parameters(), "lr": self.lr*10},
+            {"params": self.r2p1d.fc.parameters(), "lr": self.lr},
         ]
 
     def training_step(self, batch, batch_idx):
 
-        if self.args.video_stream and not self.args.audio_stream:
-            (video_chunk, labels) = batch
+        if self.args.visual_stream and not self.args.audio_stream:
+            (video_chunk, labels, clip_names) = batch
             logits = self.r2p1d(video_chunk)
             loss = self.bce_loss(logits, labels)
-        elif not args.video_stream and self.args.audio_stream:
-            (audio_chunk, labels) = batch
+        elif not args.visual_stream and self.args.audio_stream:
+            (audio_chunk, labels, clip_names) = batch
             logits = self.resnet18(audio_chunk)
             loss = self.bce_loss(logits, labels)
-        elif self.args.audio_stream and self.args.video_stream:
-            (video_chunk, audio_chunk, labels) = batch
+        elif self.args.audio_stream and self.args.visual_stream:
+            (video_chunk, audio_chunk, labels, clip_names) = batch
             logits, out_video, out_audio = self.audio_visual_network(video_chunk, audio_chunk)
             loss_audio = self.bce_loss(out_audio, labels)
             loss_video = self.bce_loss(out_video, labels)
@@ -258,17 +255,17 @@ class Model(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
 
-        if self.args.video_stream and not self.args.audio_stream:
-            (video_chunk, labels) = batch
+        if self.args.visual_stream and not self.args.audio_stream:
+            (video_chunk, labels, clip_names) = batch
             logits = self.r2p1d(video_chunk)
             loss = self.bce_loss(logits, labels)
-        elif not args.video_stream and self.args.audio_stream:
-            (audio_chunk, labels) = batch
+        elif not args.visual_stream and self.args.audio_stream:
+            (audio_chunk, labels, clip_names) = batch
             logits = self.resnet18(audio_chunk)
             loss = self.bce_loss(logits, labels)
 
-        elif self.args.audio_stream and self.args.video_stream:
-            (video_chunk, audio_chunk, labels) = batch
+        elif self.args.audio_stream and self.args.visual_stream:
+            (video_chunk, audio_chunk, labels, clip_names) = batch
             logits, out_video, out_audio = self.audio_visual_network(video_chunk, audio_chunk)
             loss_audio = self.bce_loss(out_audio, labels)
             loss_video = self.bce_loss(out_video, labels)
@@ -300,21 +297,29 @@ class Model(pl.LightningModule):
     
     def test_step(self, batch, batch_idx):
 
-        if self.args.video_stream and not self.args.audio_stream:
-            (video_chunk, labels) = batch
+        if self.args.visual_stream and not self.args.audio_stream:
+            (video_chunk, labels, clip_names) = batch
             logits = self.r2p1d(video_chunk)
             loss = self.bce_loss(logits, labels)
-        elif not args.video_stream and self.args.audio_stream:
-            (audio_chunk, labels) = batch
+        elif not args.visual_stream and self.args.audio_stream:
+            (audio_chunk, labels, clip_names) = batch
             logits = self.resnet18(audio_chunk)
             loss = self.bce_loss(logits, labels)
 
-        elif self.args.audio_stream and self.args.video_stream:
-            (video_chunk, audio_chunk, labels) = batch
+        elif self.args.audio_stream and self.args.visual_stream:
+            (video_chunk, audio_chunk, labels, clip_names) = batch
             logits, out_video, out_audio = self.audio_visual_network(video_chunk, audio_chunk)
             loss_audio = self.bce_loss(out_audio, labels)
             loss_video = self.bce_loss(out_video, labels)
             loss_multi = self.bce_loss(logits, labels)
+            
+            dict_scores = {}
+            for idx, clip_name in enumerate(clip_names):
+                if labels[idx] == 1:
+                    dict_scores[clip_name] = {'audio': out_audio[idx].cpu().numpy().item(), 'visual': out_video[idx].cpu().numpy().item(), 'audio-visual':logits[idx].cpu().numpy().item()}
+            
+            with open(f'scores/val_scores_batch_{batch_idx}.json', 'w') as f:
+                json.dump(dict_scores, f)
 
             loss = loss_multi + loss_video + loss_audio
             self.log('Validation_loss_audio', loss_audio, 
@@ -407,10 +412,17 @@ if __name__ == "__main__":
     model = Model(args, world_size=trainer.num_gpus)
 
     if args.test:
+        tester = pl.Trainer(gpus=-1,
+                        accelerator='ddp',
+                        progress_bar_refresh_rate=1,
+                        weights_summary='top',
+                        profiler="simple",
+                        num_sanity_val_steps=0)
+
         path = args.checkpoint
-        model_test = Model.load_from_checkpoint(path, args=args, world_size=trainer.num_gpus)
+        model_test = Model.load_from_checkpoint(path, args=args, world_size=tester.num_gpus)
         print(f'Testing model from: {path}')
-        trainer.test(model_test)
+        tester.test(model_test)
     else:
-        print(f'Training model with audio: {args.audio_stream} and visual: {args.video_stream}')
+        print(f'Training model with audio: {args.audio_stream} and visual: {args.visual_stream}')
         trainer.fit(model)
