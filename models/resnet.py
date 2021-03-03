@@ -1,7 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+try:
+    from torch.hub import load_state_dict_from_url
+except ImportError:
+    from torch.utils.model_zoo import load_url as load_state_dict_from_url
 
 
 def conv3x3(in_planes, out_planes, stride=1, groups=1, dilation=1):
@@ -58,9 +61,10 @@ class ResNet(nn.Module):
 
     def __init__(self, block, layers, num_classes=1000, pool = 'avgpool',zero_init_residual=False,
                  groups=1, width_per_group=64, replace_stride_with_dilation=None,
-                 norm_layer=None):
+                 norm_layer=None, last_fc=True):
         super(ResNet, self).__init__()
         self.pool = pool
+        self.last_fc = last_fc
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         self._norm_layer = norm_layer
@@ -90,11 +94,12 @@ class ResNet(nn.Module):
                                        dilate=replace_stride_with_dilation[2])
         if self.pool == 'avgpool':
             self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        
-            self.fc = nn.Linear(512 * block.expansion, num_classes) # 8192
-        elif self.pool == 'vlad':
+            if self.last_fc:
+                self.fc = nn.Linear(512 * block.expansion, num_classes) # 8192
+        elif self.pool == 'vlad' and last_fc:
             self.avgpool = NetVLAD()
-            self.fc_ = nn.Linear(8192 * block.expansion, num_classes)
+            if self.last_fc:
+                self.fc_ = nn.Linear(8192 * block.expansion, num_classes)
         
 
         for m in self.modules():
@@ -150,7 +155,9 @@ class ResNet(nn.Module):
         x = self.layer3(x)
         x = self.layer4(x)
         x = self.avgpool(x)
-        x = x.reshape(x.size(0), -1)
+        x = x.flatten(1)
+        if not self.last_fc:
+            return x
         if self.pool == 'avgpool':
             x = self.fc(x)
         elif self.pool == 'vlad':

@@ -57,10 +57,10 @@ def get_params():
                         help='Start training from scratct,' 
                         ' starting from K-400 by default')
     parser.add_argument('--video_model_path', type=str, 
-                        default='models/r2plus1d_18-91a641e6.pth',
+                        default='model_checkpoints/r2plus1d_18-91a641e6.pth',
                         help='pretrained K400 model path')
     parser.add_argument('--audio_model_path', type=str, 
-                        default='models/vggsound_avgpool.pth.tar',
+                        default='model_checkpoints/vggsound_avgpool.pth.tar',
                         help='pretrained K400 model path')
     parser.add_argument('--num_classes', type=int, default=1,
                         help='Number of classes')

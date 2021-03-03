@@ -4,6 +4,6 @@ examples/
 __pychache__/
 misc/
 experiments/
-models/
+model_checkpoints/
 data/*sample*
 data/movies

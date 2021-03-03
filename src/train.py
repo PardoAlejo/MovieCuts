@@ -4,8 +4,12 @@ from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.nn import functional as F
 import torchvision
-from torchvision.models.video import r2plus1d_18
+import sys
+sys.path.insert(1, '/home/pardogl/LTC-e2e/models')
+print(sys.path)
+from video_resnet import r2plus1d_18
 from audio_model import AVENet
+from audio_visual_model import AudioVisualModel
 from dataset import MovieDataset
 from torch.utils.data import DataLoader
 from pytorch_lightning import loggers as pl_loggers
@@ -100,7 +104,8 @@ class Model(pl.LightningModule):
         self.world_size = world_size
         self.lr = self.args.initial_lr * self.world_size
 
-        if self.args.video_stream:
+        if self.args.video_stream and not self.args.audio_stream:
+
             self.r2p1d = r2plus1d_18(num_classes=self.args.num_classes)
             self.r2p1d.stem.requires_grad_(False)
             if not self.args.from_scratch:
@@ -111,15 +116,24 @@ class Model(pl.LightningModule):
                 pass
                 # self.params = self.r2p1d.parameters()
 
-        if self.args.audio_stream:
+        if not self.args.video_stream and self.args.audio_stream:
 
-            self.resnet18 = AVENet(model_depth=18, n_classes=self.args.num_classes)
+            self.resnet18 = AVENet(model_depth=18, num_classes=self.args.num_classes)
             if not self.args.from_scratch:
                 self._load_pretrained()
                 self._set_layers_params_audio()
             else:
                 # TODO: Implement loading params from scratch
-                pass        
+                pass       
+        
+        if self.args.video_stream and self.args.audio_stream:
+            self.audio_visual_network = AudioVisualModel(num_classes=self.args.num_classes, mlp=True)
+            if not self.args.from_scratch:
+                self._load_pretrained()
+                self._set_layers_params_multi()
+            else:
+                # TODO: Implement loading params from scratch
+                pass 
 
         self._train_dataloader, self._val_dataloader = get_dataloader(args)
 
@@ -128,34 +142,62 @@ class Model(pl.LightningModule):
         self.save_hyperparameters()
 
     def forward(self, x):
-        if self.args.video_stream:
+        if self.args.video_stream and not self.args.audio_stream:
             predictions = self.r2p1d(x)
-        if self.args.audio_stream:
-            self.sound_stream(x)
+        elif not args.video_stream and self.args.audio_stream:
+            self.resnet18(x)
+        elif args.video_stream and self.args.audio_stream:
+            pass
         return predictions
 
     def _load_pretrained(self, stream='visual'):
         
-        if self.args.video_stream:
+        if self.args.video_stream and not self.args.audio_stream:
             state = torch.load(self.args.video_model_path)
             state_dict = self.r2p1d.state_dict()
-            model = self.r2p1d
-            print(f'Loading weights from from: {self.args.video_model_path}')
-        elif self.args.audio_stream:
+
+            for k, v in state.items():
+                if 'fc' in k:
+                    continue
+                state_dict.update({k: v})
+            self.r2p1d.load_state_dict(state_dict)
+
+            print(f'Loaded visual weights from: {self.args.video_model_path}')
+
+        elif self.args.audio_stream and not self.args.video_stream:
             state = torch.load(self.args.audio_model_path)['model_state_dict']
             state_dict = self.resnet18.state_dict()
-            model = self.resnet18
-            print(f'Loading weights from from: {self.args.audio_model_path}')
-
-        for k, v in state.items():
-            if 'fc' in k:
-                continue
-            state_dict.update({k: v})
-        model.load_state_dict(state_dict)
+            
+            for k, v in state.items():
+                if 'fc' in k:
+                    continue
+                state_dict.update({k: v})
+            self.resnet18.load_state_dict(state_dict)
         
+            print(f'Loaded audio weights from: {self.args.audio_model_path}')
+
+        elif self.args.audio_stream and self.args.video_stream:
+            state_visual = torch.load(self.args.video_model_path)
+            state_audio = torch.load(self.args.audio_model_path)['model_state_dict']
+            state_dict = self.audio_visual_network.state_dict()
+            
+            for k, v in state_visual.items():
+                if 'fc' in k:
+                    continue
+                state_dict.update({'r2p1d.'+k: v})
+            
+            for k, v in state_audio.items():
+                if 'fc' in k:
+                    continue
+                state_dict.update({k: v})
+
+            self.audio_visual_network.load_state_dict(state_dict)
 
     def _set_layers_params_audio(self):
         self.params = self.resnet18.parameters()
+
+    def _set_layers_params_multi(self):
+        self.params = self.audio_visual_network.parameters()
 
     def _set_layers_params_video(self):
         self.params = [
@@ -169,15 +211,35 @@ class Model(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
 
-        if self.args.video_stream:
+        if self.args.video_stream and not self.args.audio_stream:
             (video_chunk, labels) = batch
             logits = self.r2p1d(video_chunk)
             loss = self.bce_loss(logits, labels)
-        if self.args.audio_stream:
+        elif not args.video_stream and self.args.audio_stream:
             (audio_chunk, labels) = batch
             logits = self.resnet18(audio_chunk)
             loss = self.bce_loss(logits, labels)
-        
+        elif self.args.audio_stream and self.args.video_stream:
+            (video_chunk, audio_chunk, labels) = batch
+            logits, out_video, out_audio = self.audio_visual_network(video_chunk, audio_chunk)
+            loss_audio = self.bce_loss(out_audio, labels)
+            loss_video = self.bce_loss(out_video, labels)
+            loss_multi = self.bce_loss(logits, labels)
+
+            loss = loss_multi + loss_video + loss_audio
+            self.log('Traning_loss_audio', loss_audio, 
+                    on_step=True, 
+                    on_epoch=True, 
+                    logger=True)
+            self.log('Traning_loss_video', loss_video, 
+                    on_step=True, 
+                    on_epoch=True, 
+                    logger=True)
+            self.log('Traning_loss_multi', loss_multi, 
+                    on_step=True, 
+                    on_epoch=True, 
+                    logger=True)
+
         self.log('Traning_loss', loss, 
                     on_step=True, 
                     on_epoch=True, 
@@ -194,14 +256,35 @@ class Model(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
 
-        if self.args.video_stream:
+        if self.args.video_stream and not self.args.audio_stream:
             (video_chunk, labels) = batch
             logits = self.r2p1d(video_chunk)
             loss = self.bce_loss(logits, labels)
-        if self.args.audio_stream:
+        elif not args.video_stream and self.args.audio_stream:
             (audio_chunk, labels) = batch
             logits = self.resnet18(audio_chunk)
             loss = self.bce_loss(logits, labels)
+
+        elif self.args.audio_stream and self.args.video_stream:
+            (video_chunk, audio_chunk, labels) = batch
+            logits, out_video, out_audio = self.audio_visual_network(video_chunk, audio_chunk)
+            loss_audio = self.bce_loss(out_audio, labels)
+            loss_video = self.bce_loss(out_video, labels)
+            loss_multi = self.bce_loss(logits, labels)
+
+            loss = loss_multi + loss_video + loss_audio
+            self.log('Validation_loss_audio', loss_audio, 
+                    on_step=True, 
+                    on_epoch=True, 
+                    logger=True)
+            self.log('Validation_loss_video', loss_video, 
+                    on_step=True, 
+                    on_epoch=True, 
+                    logger=True)
+            self.log('Validation_loss_multi', loss_multi, 
+                    on_step=True, 
+                    on_epoch=True, 
+                    logger=True)
 
         self.log('Validation_loss', 
                 loss, 
@@ -215,21 +298,42 @@ class Model(pl.LightningModule):
     
     def test_step(self, batch, batch_idx):
 
-        if self.args.video_stream:
+        if self.args.video_stream and not self.args.audio_stream:
             (video_chunk, labels) = batch
             logits = self.r2p1d(video_chunk)
             loss = self.bce_loss(logits, labels)
-        if self.args.audio_stream:
+        elif not args.video_stream and self.args.audio_stream:
             (audio_chunk, labels) = batch
             logits = self.resnet18(audio_chunk)
             loss = self.bce_loss(logits, labels)
 
-        self.log('Test_loss', 
+        elif self.args.audio_stream and self.args.video_stream:
+            (video_chunk, audio_chunk, labels) = batch
+            logits, out_video, out_audio = self.audio_visual_network(video_chunk, audio_chunk)
+            loss_audio = self.bce_loss(out_audio, labels)
+            loss_video = self.bce_loss(out_video, labels)
+            loss_multi = self.bce_loss(logits, labels)
+
+            loss = loss_multi + loss_video + loss_audio
+            self.log('Validation_loss_audio', loss_audio, 
+                    on_step=True, 
+                    on_epoch=True, 
+                    logger=True)
+            self.log('Validation_loss_video', loss_video, 
+                    on_step=True, 
+                    on_epoch=True, 
+                    logger=True)
+            self.log('Validation_loss_multi', loss_multi, 
+                    on_step=True, 
+                    on_epoch=True, 
+                    logger=True)
+
+        self.log('Validation_loss', 
                 loss, 
                 prog_bar=True, 
                 logger=True)
 
-        self.log('Test_Accuracy', 
+        self.log('Validation_Accuracy', 
                 self.accuracy(sigmoid(logits), labels), 
                 prog_bar=True,
                 logger=True)
