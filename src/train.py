@@ -410,4 +410,5 @@ if __name__ == "__main__":
         print(f'Testing model from: {path}')
         trainer.test(model_test)
     else:
+        print(f'Training model with audio: {args.audio_stream} and visual: {args.video_stream}')
         trainer.fit(model)
