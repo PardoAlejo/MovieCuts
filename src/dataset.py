@@ -28,9 +28,10 @@ class MovieDataset(Dataset):
                  negative_positive_ratio=1,
                  augment_temporal_shift=True,
                  pos_delta_range=list(range(5)),
+                 augment_temporal_frame_drop=True,
+                 skip_rate_range=list(range(1,6)),
                  augment_spatial_flip=True,
                  snippet_size=16,
-                 original_fps=24,
                  network_fps=15,   
                  size=(112, 112),
                  seed=4165):
@@ -47,7 +48,6 @@ class MovieDataset(Dataset):
         self.visual_stream = visual_stream
         self.audio_stream = audio_stream
         self.snippet_size = snippet_size
-        self.original_fps = original_fps
         self.network_fps = network_fps
         self.time_span = self.snippet_size/self.network_fps
         self.height, self.width = size
@@ -77,23 +77,6 @@ class MovieDataset(Dataset):
         avg_num_shots = num_shots/len(self.shots_df_by_video_id)
         return avg_num_shots
 
-    def get_clip_ffmpeg(self, video_path, start_time, time_span):
-        vframes = int(np.floor(time_span*self.original_fps))
-        cmd = (
-            ffmpeg
-            .input(video_path, ss=start_time)
-            .filter('fps', fps=self.original_fps)
-            .filter('scale', 1280, 720)
-            )
-        out, _ = (
-        cmd.output('pipe:', format='rawvideo', pix_fmt='rgb24', vframes=vframes)
-        .run(capture_stdout=True, quiet=True)
-        )
-
-        clip = np.frombuffer(out, np.uint8).reshape([-1, 720, 1280, 3])
-        clip = torch.from_numpy(clip.astype('uint8'))
-
-        return clip
     
     def get_clip_audio(self, clip_path, start_time, time_span, left=True, right=True):
         clip_name = os.path.basename(clip_path)
