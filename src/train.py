@@ -50,6 +50,8 @@ def get_transforms(args):
 
 def generate_experiment_name(args):
     return f'experiment_'\
+            f'_audio_{args.audio_stream}'\
+            f'_visual_{args.visual_stream}'\
             f'_lr-{args.initial_lr}'\
             f'_val-neg-ratio-{args.negative_positive_ratio_val}'\
             f'_batchsize-{args.batch_size}'\
