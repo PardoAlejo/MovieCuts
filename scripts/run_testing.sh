@@ -13,7 +13,7 @@ echo `hostname`
 # LRs=(0.01 0.001 0.03 0.003)
 # DEVICES=(0,1 2,3 4,5 6,7)
 
-python src/train.py --shots_file_name_train data/annotated_clips_train.csv \
+python src/pretrain.py --shots_file_name_train data/annotated_clips_train.csv \
                 --shots_file_name_val data/annotated_clips_val.csv \
                 --num_workers 8 \
                 --batch_size 32 \

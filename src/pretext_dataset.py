@@ -13,7 +13,7 @@ import soundfile as sf
 import json
 import matplotlib.pyplot as plt
 
-class MovieDataset(Dataset):
+class PretextDataset(Dataset):
     """Construct an untrimmed video classification dataset.
     stream: visual, audio, audiovisual
     """

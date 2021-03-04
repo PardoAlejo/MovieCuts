@@ -7,3 +7,9 @@ experiments/
 model_checkpoints/
 data/*sample*
 data/movies
+data/clips
+data/dataset_csvs
+data/framed_clips
+examples*
+*.json
+*.txt

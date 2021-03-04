@@ -10,7 +10,7 @@ print(sys.path)
 from video_resnet import r2plus1d_18
 from audio_model import AVENet
 from audio_visual_model import AudioVisualModel
-from dataset import MovieDataset
+from pretext_dataset import PretextDataset
 from torch.utils.data import DataLoader
 from pytorch_lightning import loggers as pl_loggers
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
