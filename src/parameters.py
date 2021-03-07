@@ -90,7 +90,7 @@ def get_params():
     # Fine tune train set params
     parser.add_argument('--finetune_data_percent', type=float, default=1,
                         help='Percentage of data to finetune with')
-    parser.add_argument('--distribution', type=str, defeault='natural',
+    parser.add_argument('--distribution', type=str, default='natural',
                         choices=['natural', 'uniform', 'sqrt'],
                         help='Data distribution for training')
 
