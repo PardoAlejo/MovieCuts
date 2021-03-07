@@ -58,6 +58,7 @@ def generate_experiment_name_pretrain(args):
             f'_snippet_{args.snippet_size}'\
             f'_lr-{args.pretrain_initial_lr}'\
             f'_batchsize-{args.pretrain_batch_size}'\
+            f'_loss_weights-v_{args.pretrain_vbeta}-a_{args.pretrain_abeta}-av-_{args.pretrain_avbeta}'\
             f'_seed-{args.seed}'
 
 def get_dataloader(args):
@@ -104,6 +105,11 @@ class ModelPretrain(pl.LightningModule):
     def __init__(self, args, world_size):
         super().__init__()
         self.args = args
+
+        self.beta_visual = args.pretrain_vbeta
+        self.beta_audio = args.pretrain_abeta
+        self.beta_audio_visual = args.pretrain_avbeta
+
         self.batch_size = self.args.pretrain_batch_size
 
         self.params = None
@@ -230,7 +236,10 @@ class ModelPretrain(pl.LightningModule):
             loss_video = self.bce_loss(out_video, labels)
             loss_multi = self.bce_loss(logits, labels)
 
-            loss = loss_multi + loss_video + loss_audio
+            loss = self.beta_audio_visual*loss_multi \
+                    + self.beta_visual*loss_video \
+                    + self.beta_audio*loss_audio
+
             self.log('Traning_loss_audio', loss_audio, 
                     on_step=True, 
                     on_epoch=True, 
@@ -276,7 +285,10 @@ class ModelPretrain(pl.LightningModule):
             loss_video = self.bce_loss(out_video, labels)
             loss_multi = self.bce_loss(logits, labels)
 
-            loss = loss_multi + loss_video + loss_audio
+            loss = self.beta_audio_visual*loss_multi \
+                    + self.beta_visual*loss_video \
+                    + self.beta_audio*loss_audio
+
             self.log('Validation_loss_audio', loss_audio, 
                     on_step=True, 
                     on_epoch=True, 
@@ -326,7 +338,10 @@ class ModelPretrain(pl.LightningModule):
             # with open(f'scores/val_scores_batch_{batch_idx}.json', 'w') as f:
             #     json.dump(dict_scores, f)
 
-            loss = loss_multi + loss_video + loss_audio
+            loss = self.beta_audio_visual*loss_multi \
+                    + self.beta_visual*loss_video \
+                    + self.beta_audio*loss_audio
+
             self.log('Validation_loss_audio', loss_audio, 
                     on_step=True, 
                     on_epoch=True, 

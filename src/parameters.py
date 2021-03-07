@@ -66,15 +66,33 @@ def get_params():
                         help='Number of classes')
     parser.add_argument('--experiments_dir', type=str, default='experiments',
                         help='Number of classes')
+    #Loss Parameters
 
+    parser.add_argument('--pretrain_vbeta', type=float, default=1,
+                        help='Loss weight for visual pretrain')
+    parser.add_argument('--pretrain_abeta', type=float, default=1,
+                        help='Loss weight for audio pretrain')
+    parser.add_argument('--pretrain_avbeta', type=float, default=1,
+                        help='Loss weight for audio-visual pretrain')
+    
+    parser.add_argument('--finetune_vbeta', type=float, default=1,
+                        help='Loss weight for visual finetuning')
+    parser.add_argument('--finetune_abeta', type=float, default=1,
+                        help='Loss weight for audio finetuning')
+    parser.add_argument('--finetune_avbeta', type=float, default=1,
+                        help='Loss weight for audio-visual finetuning')
     # Test or load checkpoint
     parser.add_argument('--pretrain_checkpoint', type=str, default='store_true',
                         help='Checkpoint to test or resume')
     parser.add_argument('--pretrain_test', action='store_true',
                         help='Checkpoint to test or resume')                    
 
+    # Fine tune train set params
     parser.add_argument('--finetune_data_percent', type=float, default=1,
                         help='Percentage of data to finetune with')
+    parser.add_argument('--distribution', type=str, defeault='natural',
+                        choices=['natural', 'uniform', 'sqrt'],
+                        help='Data distribution for training')
 
     parser.add_argument('--cut_type_file_name_train', type=str, default='data/cut-type-train.json',
                         help='Cut types for training')

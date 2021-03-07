@@ -52,11 +52,17 @@ def get_transforms(args):
     return transform_train, transform_val
 
 def generate_experiment_name_finetune(args):
+    
+    if not args.epoch:
+        epoch = 'last'
+    else:
+        epoch = args.epoch
     return f'cut-type_'\
             f'data-percent_{args.finetune_data_percent}'\
-            f'_initialization-{args.initialization}'\
-            f'_epoch-{args.epoch}' \
+            f'_distribution_{args.distribution}'\
+            f'_epoch-{epoch}' \
             f'_lr-{args.finetune_initial_lr}'\
+            f'_loss_weights-v_{args.finetune_vbeta}-a_{args.finetune_abeta}-av-_{args.finetune_avbeta}'\
             f'_batchsize-{args.finetune_batch_size}'
 
 def get_dataloader(args):
@@ -118,6 +124,11 @@ class ModelFinetune(pl.LightningModule):
     def __init__(self, args, world_size):
         super().__init__()
         self.args = args
+
+        self.beta_visual = args.finetune_vbeta
+        self.beta_audio = args.finetune_abeta
+        self.beta_audio_visual = args.finetune_avbeta
+
         self.batch_size = self.args.finetune_batch_size
 
         self._train_dataloader, self._val_dataloader, self._test_dataloader = get_dataloader(args)
@@ -155,7 +166,7 @@ class ModelFinetune(pl.LightningModule):
             print('Training from scratch')
             
         self.accuracy = pl.metrics.Accuracy()
-        self.f1 = pl.metrics.F1(num_classes=self.num_classes, average='weighted', dist_sync_on_step=True)
+        self.f1 = pl.metrics.F1(num_classes=self.num_classes, average='macro', dist_sync_on_step=True)
         self.f1_per_class = pl.metrics.F1(num_classes=self.num_classes, average=None)
         self.confusion_matrix = pl.metrics.ConfusionMatrix(num_classes=self.num_classes, normalize='true')
         self.save_hyperparameters()
@@ -265,7 +276,10 @@ class ModelFinetune(pl.LightningModule):
             loss_video = self.bce_loss(out_video, labels)
             loss_multi = self.bce_loss(logits, labels)
 
-            loss = loss_multi + loss_video + loss_audio
+            loss = self.beta_audio_visual*loss_multi \
+                    + self.beta_visual*loss_video \
+                    + self.beta_audio*loss_audio
+
             self.log('Traning_loss_audio', loss_audio, 
                     on_step=True, 
                     on_epoch=True, 
@@ -311,7 +325,10 @@ class ModelFinetune(pl.LightningModule):
             loss_video = self.bce_loss(out_video, labels)
             loss_multi = self.bce_loss(logits, labels)
 
-            loss = loss_multi + loss_video + loss_audio
+            loss = self.beta_audio_visual*loss_multi \
+                    + self.beta_visual*loss_video \
+                    + self.beta_audio*loss_audio
+
             self.log('Validation_loss_audio', loss_audio, 
                     on_step=True, 
                     on_epoch=True, 
@@ -355,7 +372,10 @@ class ModelFinetune(pl.LightningModule):
             loss_video = self.bce_loss(out_video, labels)
             loss_multi = self.bce_loss(logits, labels)
 
-            loss = loss_multi + loss_video + loss_audio
+            loss = self.beta_audio_visual*loss_multi \
+                    + self.beta_visual*loss_video \
+                    + self.beta_audio*loss_audio
+
             self.log('Test_loss_audio', loss_audio, 
                     on_step=True, 
                     on_epoch=True, 
