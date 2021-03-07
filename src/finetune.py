@@ -5,7 +5,8 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.nn import functional as F
 import torchvision
 import sys
-sys.path.insert(1, '/home/pardogl/LTC-e2e/models')
+import os
+sys.path.insert(1, f'{os.getcwd()}/models')
 print(sys.path)
 from video_resnet import r2plus1d_18
 from audio_model import AVENet
@@ -92,7 +93,8 @@ def get_dataloader(args):
             batch_size=args.finetune_batch_size,
             num_workers=args.num_workers,
             pin_memory=True,
-            shuffle=False)
+            shuffle=False,
+            drop_last=True)
 
     val_dataloader = DataLoader(
             val_dataset,
@@ -153,8 +155,13 @@ class ModelFinetune(pl.LightningModule):
             print('Training from scratch')
             
         self.accuracy = pl.metrics.Accuracy()
-        self.ap = pl.metrics.AveragePrecision()
+        self.f1 = pl.metrics.F1(num_classes=self.num_classes, average='weighted', dist_sync_on_step=True)
+        self.f1_per_class = pl.metrics.F1(num_classes=self.num_classes, average=None)
+        self.confusion_matrix = pl.metrics.ConfusionMatrix(num_classes=self.num_classes, normalize='true')
         self.save_hyperparameters()
+
+        self.val_logits_epoch = []
+        self.val_labels_epoch = []
 
     def forward(self, x):
         if self.args.visual_stream and not self.args.audio_stream:
@@ -241,6 +248,7 @@ class ModelFinetune(pl.LightningModule):
             self.audio_visual_network.load_state_dict(state_dict)
 
     def training_step(self, batch, batch_idx):
+        
 
         if self.args.visual_stream and not self.args.audio_stream:
             (video_chunk, labels, clip_names) = batch
@@ -276,13 +284,13 @@ class ModelFinetune(pl.LightningModule):
                     on_epoch=True, 
                     prog_bar=True, 
                     logger=True)
-        self.log('Training_AP', 
-                    self.ap(sigmoid(logits), labels),
+        self.log('Training_F1', 
+                    self.f1(sigmoid(logits), labels),
                     prog_bar=True, 
                     on_epoch=True, 
                     on_step=True, 
                     logger=True)
-        
+            
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -291,7 +299,7 @@ class ModelFinetune(pl.LightningModule):
             (video_chunk, labels, clip_names) = batch
             logits = self.r2p1d(video_chunk)
             loss = self.bce_loss(logits, labels)
-        elif not args.visual_stream and self.args.audio_stream:
+        elif not self.args.visual_stream and self.args.audio_stream:
             (audio_chunk, labels, clip_names) = batch
             logits = self.resnet18(audio_chunk)
             loss = self.bce_loss(logits, labels)
@@ -322,15 +330,15 @@ class ModelFinetune(pl.LightningModule):
                 prog_bar=True, 
                 logger=True)
 
-        self.log('Validation_AP', 
-                self.ap(sigmoid(logits), labels), 
+        self.log('Validation_f1', 
+                self.f1(sigmoid(logits), labels), 
                 prog_bar=True,
                 logger=True)
-
-        return self.log
+        
+        return logits, labels
 
     def test_step(self, batch, batch_idx):
-
+        
         if self.args.visual_stream and not self.args.audio_stream:
             (video_chunk, labels, clip_names) = batch
             logits = self.r2p1d(video_chunk)
@@ -366,10 +374,12 @@ class ModelFinetune(pl.LightningModule):
                 prog_bar=True, 
                 logger=True)
 
-        self.log('Test_AP', 
-                self.ap(sigmoid(logits), labels), 
+        self.log('Test_f1', 
+                self.f1(sigmoid(logits), labels), 
                 prog_bar=True,
                 logger=True)
+        
+        return logits, labels
 
     def configure_optimizers(self):
         optimizer = torch.optim.SGD(self.params, 
@@ -391,7 +401,7 @@ class ModelFinetune(pl.LightningModule):
 
     def bce_loss(self, logits, labels):
         bce = F.binary_cross_entropy_with_logits(
-                logits.squeeze(),
+                logits,
                 labels.type_as(logits))
         return bce
 

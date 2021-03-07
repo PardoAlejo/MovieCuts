@@ -17,11 +17,9 @@ conda activate torch1.3
 NVDASHBOARD_PORT=8000 
 python -m jupyterlab_nvdashboard.server $NVDASHBOARD_PORT &
 NVDASHBOARD_PID=$!
-python src/pretrain.py --shots_file_name_train data/train_sample.csv \
-                --shots_file_name_val data/val_sample.csv \
+python src/pretrain.py --shots_file_name_train \
                 --num_workers 32 \
-                --batch_size 48 \
-                --initial_lr $LR \
-                --fc_lr 0.001 \
+                --pretrain_batch_size 48 \
+                --pretrain_initial_lr $LR \
                 --negative_positive_ratio_val 1
 kill $NVDASHBOARD_PID

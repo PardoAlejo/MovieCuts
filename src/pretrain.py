@@ -5,7 +5,8 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.nn import functional as F
 import torchvision
 import sys
-sys.path.insert(1, '/home/pardogl/LTC-e2e/models')
+import os
+sys.path.insert(1, f'{os.getcwd()}/models')
 print(sys.path)
 from video_resnet import r2plus1d_18
 from audio_model import AVENet

@@ -13,8 +13,8 @@ echo `hostname`
 # LRs=(0.01 0.001 0.03 0.003)
 # DEVICES=(0,1 2,3 4,5 6,7)
 
-CUDA_VISIBLE_DEVICES=3 python src/finetune.py \
-                --finetune_data_percent 0.1 \
+CUDA_VISIBLE_DEVICES=1 python src/finetune.py \
+                --finetune_data_percent 0.001 \
                 --num_workers 8 \
                 --finetune_batch_size 20 \
                 --finetune_initial_lr 0.003 \

@@ -58,7 +58,7 @@ class CutTypeDataset(Dataset):
 
         self.cut_types = json_file['cut_types']
         self.clip_names = list(self.cut_type_annotations.keys())
-        if self.mode == 'train':
+        if self.mode:
             num_samples = int(data_percent*len(self.clip_names))
             self.clip_names = random.sample(self.clip_names, k=num_samples)
 

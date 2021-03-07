@@ -1,7 +1,7 @@
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
 from pytorch_lightning.callbacks import LearningRateMonitor
-from callbacks import PrintCallback
+from callbacks import *
 from pretrain import ModelPretrain, generate_experiment_name_pretrain
 from finetune import ModelFinetune, generate_experiment_name_finetune
 from parameters import get_params
@@ -33,7 +33,7 @@ if __name__ == "__main__":
         
         ModelCheckpointPretrain = ModelCheckpoint(
                                     dirpath=pretrain_experiment,
-                                    filename='epoch-{epoch}',
+                                    filename='epoch-{epoch}-_ValAcc-{Validation_Accuracy:1.2f}',
                                     save_last=True,
                                     period=1,
                                     )
@@ -73,12 +73,14 @@ if __name__ == "__main__":
 
     ModelCheckpointPretrain = ModelCheckpoint(
                                     dirpath=f'{pretrain_experiment}/{experiment_name_finetune}',
-                                    monitor='Validation_AP',
-                                    filename='epoch-{epoch}',
+                                    monitor='Validation_f1',
+                                    filename='epoch-{epoch}_Valf1-{Validation_f1:1.2f}',
                                     save_top_k=2,
-                                    mode='max'
+                                    mode='max',
+                                    period=2
                                     )
 
+    callbacks=[lr_monitor_finetuning, ModelCheckpointPretrain, ValidationBatchAccumulator(),APClassAnalysis()]
     trainer_finetune = pl.Trainer(gpus=-1,
                         accelerator='ddp',
                         check_val_every_n_epoch=1,
@@ -86,7 +88,7 @@ if __name__ == "__main__":
                         weights_summary='top',
                         max_epochs=args.finetune_max_epochs,
                         logger=tb_logger_finetune,
-                        callbacks=[lr_monitor_finetuning, ModelCheckpointPretrain, PrintCallback()],
+                        callbacks=callbacks,
                         profiler="simple",
                         num_sanity_val_steps=0) 
 
