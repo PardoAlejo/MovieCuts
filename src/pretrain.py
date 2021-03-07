@@ -113,9 +113,9 @@ class ModelPretrain(pl.LightningModule):
         if self.args.visual_stream and not self.args.audio_stream:
 
             self.r2p1d = r2plus1d_18(num_classes=self.args.pretrain_num_classes)
-            self.r2p1d.stem.requires_grad_(False)
             if not self.args.pretrain_from_scratch:
-                self._load_pretrained(stream='visual')
+                self.r2p1d.stem.requires_grad_(False)
+                self._load_pretrained()
             self._set_layers_params_video()
             
 
@@ -149,7 +149,7 @@ class ModelPretrain(pl.LightningModule):
             pass
         return predictions
 
-    def _load_pretrained(self, stream='visual'):
+    def _load_pretrained(self):
         
         if self.args.visual_stream and not self.args.audio_stream:
             state = torch.load(self.args.video_model_path)
@@ -205,7 +205,7 @@ class ModelPretrain(pl.LightningModule):
             {"params": self.r2p1d.layer2.parameters()},
             {"params": self.r2p1d.layer3.parameters()},
             {"params": self.r2p1d.layer4.parameters()},
-            {"params": self.r2p1d.fc.parameters(), "lr": self.lr},
+            {"params": self.r2p1d.fc.parameters(), "lr": self.lr*10},
         ]
 
     def training_step(self, batch, batch_idx):
@@ -214,6 +214,10 @@ class ModelPretrain(pl.LightningModule):
             (video_chunk, labels, clip_names) = batch
             logits = self.r2p1d(video_chunk)
             loss = self.bce_loss(logits, labels)
+            if np.isnan(loss.detach().cpu().numpy()):
+                print('NAN!!!!!!')
+                print(logits)
+                print(labels)
         elif not self.args.visual_stream and self.args.audio_stream:
             (audio_chunk, labels, clip_names) = batch
             logits = self.resnet18(audio_chunk)
