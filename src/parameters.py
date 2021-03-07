@@ -42,9 +42,9 @@ def get_params():
                         help='Lr decay')
     parser.add_argument("--weight-decay", default=1e-4, type=float, 
                         help="weight decay (default: 1e-4)")
-    parser.add_argument("--pretrain_max_epochs", default=8, type=int,
+    parser.add_argument("--pretrain_max_epochs", default=5, type=int,
                         help="Max number of epochs for training")
-    parser.add_argument("--pretrain_lr-milestones",nargs="+",default=[4, 6],
+    parser.add_argument("--pretrain_lr-milestones",nargs="+",default=[3, 4],
                         type=int,help="decrease lr on milestones")
     parser.add_argument("--lr-gamma",default=0.5,type=float,
                         help="decrease lr by a factor of lr-gamma")
