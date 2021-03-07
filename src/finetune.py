@@ -21,6 +21,7 @@ from scheduler import WarmupMultiStepLR
 from parameters import get_params
 from torchvision.io import write_video
 import json
+from pytorch_lightning.loggers.csv_logs import CSVLogger 
 
 def sigmoid(X):
     return 1/(1+torch.exp(-X.squeeze()))
@@ -49,95 +50,110 @@ def get_transforms(args):
     )
     return transform_train, transform_val
 
-def generate_experiment_name(args):
-    return f'experiment_'\
-            f'_audio_{args.audio_stream}'\
-            f'_visual_{args.visual_stream}'\
-            f'_snippet_{args.snippet_size}'\
-            f'_lr-{args.initial_lr}'\
-            f'_val-neg-ratio-{args.negative_positive_ratio_val}'\
-            f'_batchsize-{args.batch_size}'\
-            f'_seed-{args.seed}'
+def generate_experiment_name_finetune(args):
+    return f'cut-type_'\
+            f'data-percent_{args.finetune_data_percent}'\
+            f'_initialization-{args.initialization}'\
+            f'_epoch-{args.epoch}' \
+            f'_lr-{args.finetune_initial_lr}'\
+            f'_batchsize-{args.finetune_batch_size}'
 
 def get_dataloader(args):
     
     transforms_train, transforms_val = get_transforms(args)
 
-    train_dataset = MovieDataset(args.shots_file_name_train,
+    train_dataset = CutTypeDataset(args.shots_file_names,
+                    args.cut_type_file_name_train,
                     visual_stream=args.visual_stream,
                     audio_stream=args.audio_stream,
                     snippet_size=args.snippet_size,
-                    transform=transforms_train,
-                    size=(args.scale_w, args.scale_h))
+                    data_percent=args.finetune_data_percent,
+                    transform=transforms_train)
     print(f'Num samples for train: {len(train_dataset)}')
 
-    val_dataset = MovieDataset(args.shots_file_name_val,
+    val_dataset = CutTypeDataset(args.shots_file_names,
+                    args.cut_type_file_name_val,
                     visual_stream=args.visual_stream,
                     audio_stream=args.audio_stream,
                     snippet_size=args.snippet_size,
-                    transform=transforms_val,
-                    negative_positive_ratio=args.negative_positive_ratio_val,
-                    size=(args.scale_w, args.scale_h))
+                    transform=transforms_val)
 
     print(f'Num samples for val: {len(val_dataset)}')
 
+    test_dataset = CutTypeDataset(args.shots_file_names,
+                    args.cut_type_file_name_test,
+                    visual_stream=args.visual_stream,
+                    audio_stream=args.audio_stream,
+                    snippet_size=args.snippet_size,
+                    transform=transforms_val)
+    
     train_dataloader = DataLoader(
             train_dataset,
-            batch_size=args.batch_size,
+            batch_size=args.finetune_batch_size,
             num_workers=args.num_workers,
             pin_memory=True,
             shuffle=False)
 
     val_dataloader = DataLoader(
             val_dataset,
-            batch_size=args.batch_size,
+            batch_size=args.finetune_batch_size,
             num_workers=args.num_workers,
             pin_memory=True,
             shuffle=False)
 
-    return train_dataloader, val_dataloader
+    test_dataloader = DataLoader(
+            val_dataset,
+            batch_size=args.finetune_batch_size,
+            num_workers=args.num_workers,
+            pin_memory=True,
+            shuffle=False)
+
+    return train_dataloader, val_dataloader, test_dataloader
 
 
-class Model(pl.LightningModule):
+class ModelFinetune(pl.LightningModule):
     
     def __init__(self, args, world_size):
         super().__init__()
         self.args = args
-        self.batch_size = self.args.batch_size
+        self.batch_size = self.args.finetune_batch_size
 
+        self._train_dataloader, self._val_dataloader, self._test_dataloader = get_dataloader(args)
+
+        self.cut_types = self._train_dataloader.dataset.cut_types
+        self.num_classes = len(self.cut_types)
         self.params = None
-        
+        self.initialization = self.args.initialization
         self.world_size = world_size
-        self.lr = self.args.initial_lr * self.world_size
+        self.lr = self.args.finetune_initial_lr * self.world_size
 
         if self.args.visual_stream and not self.args.audio_stream:
 
-            self.r2p1d = r2plus1d_18(num_classes=self.args.num_classes)
+            self.r2p1d = r2plus1d_18(num_classes=self.num_classes)
             self.r2p1d.stem.requires_grad_(False)
-            if not self.args.from_scratch:
-                self._load_pretrained(stream='visual')
-            self._set_layers_params_video()
+            self.params = self.r2p1d.parameters()
             
 
         if not self.args.visual_stream and self.args.audio_stream:
 
-            self.resnet18 = AVENet(model_depth=18, num_classes=self.args.num_classes)
-            if not self.args.from_scratch:
-                self._load_pretrained()
-            self._set_layers_params_audio()
-                   
-        
+            self.resnet18 = AVENet(model_depth=18, num_classes=self.num_classes)
+            self.params = self.resnet18.parameters()
+
         if self.args.visual_stream and self.args.audio_stream:
-            self.audio_visual_network = AudioVisualModel(num_classes=self.args.num_classes, mlp=True)
-            if not self.args.from_scratch:
-                self._load_pretrained()
-            self._set_layers_params_multi()
+            self.audio_visual_network = AudioVisualModel(num_classes=self.num_classes, mlp=True)
+            self.params = self.audio_visual_network.parameters()
              
-
-        self._train_dataloader, self._val_dataloader = get_dataloader(args)
-
+        if self.initialization == 'supervised':
+            self._load_weights_supervised()
+            print(f'Loaded models from {self.args.video_model_path} and/or {self.args.audio_model_path}')
+        elif self.initialization == 'pretrain':
+            self._load_weights_pretrain()
+            print(f'Loaded models from {self.args.pretrain_model_path}')
+        else:
+            print('Training from scratch')
+            
         self.accuracy = pl.metrics.Accuracy()
-
+        self.ap = pl.metrics.AveragePrecision()
         self.save_hyperparameters()
 
     def forward(self, x):
@@ -149,18 +165,16 @@ class Model(pl.LightningModule):
             pass
         return predictions
 
-    def _load_pretrained(self, stream='visual'):
+    def _load_weights_supervised(self):
         
         if self.args.visual_stream and not self.args.audio_stream:
             state = torch.load(self.args.video_model_path)
             state_dict = self.r2p1d.state_dict()
-
             for k, v in state.items():
                 if 'fc' in k:
                     continue
                 state_dict.update({k: v})
             self.r2p1d.load_state_dict(state_dict)
-
             print(f'Loaded visual weights from: {self.args.video_model_path}')
 
         elif self.args.audio_stream and not self.args.visual_stream:
@@ -189,24 +203,42 @@ class Model(pl.LightningModule):
                 if 'fc' in k:
                     continue
                 state_dict.update({k: v})
+            
+            self.audio_visual_network.load_state_dict(state_dict)
+    
+    def _load_weights_pretrain(self):
+        
+        state = torch.load(self.args.pretrain_model_path)['state_dict']
+
+        if self.args.visual_stream and not self.args.audio_stream:
+            state_dict = self.r2p1d.state_dict()
+            for k, v in state.items():
+                if 'fc' in k:
+                    continue
+                state_dict.update({k.replace('r2p1d.',''): v})
+            self.r2p1d.load_state_dict(state_dict)
+            print(f'Loaded visual weights from: {self.args.video_model_path}')
+
+        elif self.args.audio_stream and not self.args.visual_stream:
+            state_dict = self.resnet18.state_dict()
+            
+            for k, v in state.items():
+                if 'fc' in k:
+                    continue
+                state_dict.update({k.replace('resnet18.',''): v})
+            self.resnet18.load_state_dict(state_dict)
+        
+            print(f'Loaded audio weights from: {self.args.audio_model_path}')
+
+        elif self.args.audio_stream and self.args.visual_stream:
+            state_dict = self.audio_visual_network.state_dict()
+            
+            for k, v in state.items():
+                if 'fc_aux' in k or 'fc_final' in k:
+                    continue
+                state_dict.update({k.replace('audio_visual_network.',''): v})
 
             self.audio_visual_network.load_state_dict(state_dict)
-
-    def _set_layers_params_audio(self):
-        self.params = self.resnet18.parameters()
-
-    def _set_layers_params_multi(self):
-        self.params = self.audio_visual_network.parameters()
-
-    def _set_layers_params_video(self):
-        self.params = [
-            {"params": self.r2p1d.stem.parameters(), "lr": 0},
-            {"params": self.r2p1d.layer1.parameters()},
-            {"params": self.r2p1d.layer2.parameters()},
-            {"params": self.r2p1d.layer3.parameters()},
-            {"params": self.r2p1d.layer4.parameters()},
-            {"params": self.r2p1d.fc.parameters(), "lr": self.lr},
-        ]
 
     def training_step(self, batch, batch_idx):
 
@@ -214,7 +246,7 @@ class Model(pl.LightningModule):
             (video_chunk, labels, clip_names) = batch
             logits = self.r2p1d(video_chunk)
             loss = self.bce_loss(logits, labels)
-        elif not args.visual_stream and self.args.audio_stream:
+        elif not self.args.visual_stream and self.args.audio_stream:
             (audio_chunk, labels, clip_names) = batch
             logits = self.resnet18(audio_chunk)
             loss = self.bce_loss(logits, labels)
@@ -244,8 +276,8 @@ class Model(pl.LightningModule):
                     on_epoch=True, 
                     prog_bar=True, 
                     logger=True)
-        self.log('Training_Accuracy', 
-                    self.accuracy(sigmoid(logits), labels),
+        self.log('Training_AP', 
+                    self.ap(sigmoid(logits), labels),
                     prog_bar=True, 
                     on_epoch=True, 
                     on_step=True, 
@@ -290,11 +322,13 @@ class Model(pl.LightningModule):
                 prog_bar=True, 
                 logger=True)
 
-        self.log('Validation_Accuracy', 
-                self.accuracy(sigmoid(logits), labels), 
+        self.log('Validation_AP', 
+                self.ap(sigmoid(logits), labels), 
                 prog_bar=True,
                 logger=True)
-    
+
+        return self.log
+
     def test_step(self, batch, batch_idx):
 
         if self.args.visual_stream and not self.args.audio_stream:
@@ -312,36 +346,28 @@ class Model(pl.LightningModule):
             loss_audio = self.bce_loss(out_audio, labels)
             loss_video = self.bce_loss(out_video, labels)
             loss_multi = self.bce_loss(logits, labels)
-            
-            dict_scores = {}
-            for idx, clip_name in enumerate(clip_names):
-                if labels[idx] == 1:
-                    dict_scores[clip_name] = {'audio': out_audio[idx].cpu().numpy().item(), 'visual': out_video[idx].cpu().numpy().item(), 'audio-visual':logits[idx].cpu().numpy().item()}
-            
-            with open(f'scores/val_scores_batch_{batch_idx}.json', 'w') as f:
-                json.dump(dict_scores, f)
 
             loss = loss_multi + loss_video + loss_audio
-            self.log('Validation_loss_audio', loss_audio, 
+            self.log('Test_loss_audio', loss_audio, 
                     on_step=True, 
                     on_epoch=True, 
                     logger=True)
-            self.log('Validation_loss_video', loss_video, 
+            self.log('Test_loss_video', loss_video, 
                     on_step=True, 
                     on_epoch=True, 
                     logger=True)
-            self.log('Validation_loss_multi', loss_multi, 
+            self.log('Test_loss_multi', loss_multi, 
                     on_step=True, 
                     on_epoch=True, 
                     logger=True)
 
-        self.log('Validation_loss', 
+        self.log('Test_loss', 
                 loss, 
                 prog_bar=True, 
                 logger=True)
 
-        self.log('Validation_Accuracy', 
-                self.accuracy(sigmoid(logits), labels), 
+        self.log('Test_AP', 
+                self.ap(sigmoid(logits), labels), 
                 prog_bar=True,
                 logger=True)
 
@@ -352,7 +378,7 @@ class Model(pl.LightningModule):
                                     weight_decay=self.args.weight_decay)
 
         warmup_iters = self.args.lr_warmup_epochs * len(self._train_dataloader)
-        lr_milestones = [len(self._train_dataloader) * m for m in self.args.lr_milestones]
+        lr_milestones = [len(self._train_dataloader) * m for m in self.args.finetune_lr_milestones]
 
         lr_scheduler ={'scheduler': WarmupMultiStepLR(optimizer,
                                     milestones=lr_milestones,
@@ -376,7 +402,7 @@ class Model(pl.LightningModule):
         return self._val_dataloader
 
     def test_dataloader(self):
-        return self._val_dataloader
+        return self._test_dataloader
 
 
 if __name__ == "__main__":
@@ -393,9 +419,9 @@ if __name__ == "__main__":
     mode='min')
     lr_monitor = LearningRateMonitor(logging_interval='step')
 
-    experiment_name = generate_experiment_name(args)
+    experiment_name = generate_experiment_name_finetune(args)
     tb_logger = pl_loggers.TensorBoardLogger(args.experiments_dir, name=experiment_name)
-    
+    csv_logger = CSVLogger(args.experiments_dir, name="test")
 
     trainer = pl.Trainer(gpus=-1,
                         accelerator='ddp',
@@ -403,15 +429,15 @@ if __name__ == "__main__":
                         progress_bar_refresh_rate=1,
                         weights_summary='top',
                         max_epochs=args.max_epochs,
-                        logger=tb_logger,
+                        logger=csv_logger,
                         callbacks=[lr_monitor],
                         profiler="simple",
                         num_sanity_val_steps=0) 
 
     print(f"Using {trainer.num_gpus} gpus")
-    model = Model(args, world_size=trainer.num_gpus)
+    model = ModelFinetune(args, world_size=trainer.num_gpus)
 
-    if args.test:
+    if args.finetune_test:
         tester = pl.Trainer(gpus=-1,
                         accelerator='ddp',
                         progress_bar_refresh_rate=1,
@@ -419,7 +445,7 @@ if __name__ == "__main__":
                         profiler="simple",
                         num_sanity_val_steps=0)
 
-        path = args.checkpoint
+        path = args.finetune_checkpoint
         model_test = Model.load_from_checkpoint(path, args=args, world_size=tester.num_gpus)
         print(f'Testing model from: {path}')
         tester.test(model_test)

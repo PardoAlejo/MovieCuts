@@ -7,7 +7,7 @@ import random
 import ffmpeg
 from PIL import Image
 from scipy import signal
-import tqdm
+from tqdm import tqdm
 from torchvision.io import read_video, write_video
 import soundfile as sf
 import json
@@ -16,43 +16,63 @@ import matplotlib.pyplot as plt
 class CutTypeDataset(Dataset):
     """Construct an untrimmed video classification dataset.
     stream: visual, audio, audiovisual
+    time_audio_span: Duration of the audio window in seconds
     """
 
     def __init__(self,
-                 shots_filename,
+                 shots_filenames,
+                 cut_type_filename,
                  visual_stream=True,
                  audio_stream=True,
                  transform=None,
                  videos_path = 'data/framed_clips',
                  cache_path = './.cache',
-                 negative_positive_ratio=1,
                  augment_temporal_shift=True,
                  pos_delta_range=list(range(5)),
-                 augment_temporal_frame_drop=True,
-                 skip_rate_range=list(range(1,6)),
                  augment_spatial_flip=True,
+                 sampling='gaussian',
                  snippet_size=16,
-                 network_fps=15,   
-                 size=(112, 112),
+                 time_audio_span=10,
+                 data_percent=0.1,
                  seed=4165):
-    
-        self.shots_df = pd.read_csv(shots_filename)
+        
+        self.seed = seed
+        self.mode = 'train' if 'train' in cut_type_filename else 'val' if 'val' in cut_type_filename else 'test'
+
+        dataframes = []
+        for filename in shots_filenames:
+            this_shots_df = pd.read_csv(filename)
+            dataframes.append(this_shots_df)
+        self.shots_df = pd.concat(dataframes)
         self.shots_df_by_video_id = self.shots_df.groupby('video_id')
         self.shots_df_by_movie_id = self.shots_df.groupby('movie_id')
         self.videos_path = videos_path
         self.cache_path = cache_path
+        
+        self.data_percent = data_percent
 
         self.transform = transform
 
-        self.mode = 'train' if 'train' in shots_filename else 'val'
+        json_file = json.load(open(cut_type_filename))
+        self.cut_type_annotations = json_file['annotations']
+
+        self.cut_types = json_file['cut_types']
+        self.clip_names = list(self.cut_type_annotations.keys())
+        if self.mode == 'train':
+            num_samples = int(data_percent*len(self.clip_names))
+            self.clip_names = random.sample(self.clip_names, k=num_samples)
+
         self.visual_stream = visual_stream
         self.audio_stream = audio_stream
         self.snippet_size = snippet_size
-        self.network_fps = network_fps
-        self.time_span = self.snippet_size/self.network_fps
-        self.height, self.width = size
-        self.seed = seed
-        self.negative_positive_ratio = negative_positive_ratio
+        self.time_audio_span = time_audio_span
+
+        if sampling=='gaussian':
+            self.sampling_function = self.generate_gaussian_sampling
+        elif sampling=='uniform':
+            self.sampling_function = self.generate_uniform_sampling
+        elif sampling=='fixed':
+            self.sampling_function = self.generate_fix_window_sampling
 
         self.augment_spatial_flip = augment_spatial_flip
         self.augment_temporal_shift = augment_temporal_shift
@@ -61,14 +81,18 @@ class CutTypeDataset(Dataset):
         self.candidates = None
         self.clips_to_fps = dict(zip(self.shots_df.clip_id.tolist(),self.shots_df.fps.tolist()))
         
-        shot_file_base_name = os.path.basename(shots_filename).replace('.csv','')
-        self.cache_filename = f'{self.cache_path}/{shot_file_base_name}_np-ratio_{self.negative_positive_ratio}_seed_{self.seed}.json'
-
+        if self.mode == 'train':
+            self.cache_filename = f'{self.cache_path}/candidates_{self.mode}_cut_type_percent_{int(data_percent*100)}.json'
+        else:
+            self.cache_filename = f'{self.cache_path}/candidates_{self.mode}_cut_type_percent_{int(1*100)}.json'
         if not os.path.exists(self.cache_filename):
             self.set_candidates()
         else:
             print(f'Cache file found at: {self.cache_filename}')
             self.read_cache_candidates()
+
+    def __len__(self):
+        return (len(self.clip_names))
 
     def get_average_shots_per_scene(self):
         num_shots = 0
@@ -76,31 +100,21 @@ class CutTypeDataset(Dataset):
             num_shots += len(df)
         avg_num_shots = num_shots/len(self.shots_df_by_video_id)
         return avg_num_shots
-
     
-    def get_clip_audio(self, clip_path, start_time, time_span, left=True, right=True):
+    def get_clip_audio(self, clip_path):
         clip_name = os.path.basename(clip_path)
         audio_path = f'{clip_path}/{clip_name}.wav'
-        data, samplerate = sf.read(audio_path)
-        start_sample = int(start_time*samplerate)
-        start_sample_0 = max(0,start_sample)
-        span = int(time_span*samplerate)
-        num_neg_frames = start_sample_0 - start_sample
-        end_sample = start_sample + span
-        
-        audio = data[start_sample_0:end_sample]
-        if len(audio) < (span):
-            pad_ratio = span - len(audio)
-            if left and not right:
-                audio = np.pad(audio,(pad_ratio,0),constant_values=audio[0])
-            elif right and not left:
-                audio = np.pad(audio,(0,pad_ratio),constant_values=audio[-1])
-            elif right and left:
-                if pad_ratio == 1:
-                    audio = np.pad(audio,(pad_ratio,0),constant_values=audio[0])
-                else:
-                    audio = np.pad(audio,(int(pad_ratio/2),int(pad_ratio/2)),constant_values=(audio[0], audio[-1]))
-        return audio, samplerate
+        audio, samplerate = sf.read(audio_path)
+        span_audio = int(self.time_audio_span*samplerate)
+
+        if len(audio) < span_audio:
+            pad_ratio = span_audio - len(audio)
+            audio = np.pad(audio, (int(pad_ratio/2), int(pad_ratio/2)),constant_values=(audio[0], audio[-1]))
+        elif len(audio) > span_audio:
+            cut_ratio = int((len(audio) - span_audio)/2)
+            audio = audio[cut_ratio:-cut_ratio]
+
+        return audio[0:span_audio], samplerate
 
     def get_clip_spectogram(self, audio, samplerate, name=None):
 
@@ -116,35 +130,15 @@ class CutTypeDataset(Dataset):
             plt.savefig(name)
         return torch.from_numpy(spectrogram)
 
-
-    def get_clip_from_frames(self, clip_path, start_time, time_span, fps, left=True, right=True):
+    def get_clip_from_frames(self, clip_path, cut_time, window, fps):
         """
         clip_path path to clip frames
         """
-        
-        start_frame = int(start_time*fps)
-        vframes = int(np.ceil(time_span*fps))
-        start_frame_0 = max(0,start_frame)
-        num_neg_frames = start_frame_0 - start_frame
-        
-        filenames = [f'{clip_path}/frames/{i:06d}.jpg' for i in range(start_frame_0, start_frame_0+(vframes-num_neg_frames), 1)]
-        # filenames = [f'{clip_path}/frames/{i:06d}.jpg' for i in range(start_frame, start_frame+vframes, 1)]
+        cut_id = int(cut_time*fps)
+        ids = self.sampling_function(cut_id, window)
+
+        filenames = [f'{clip_path}/frames/{i:06d}.jpg' for i in ids]
         frames = []
-
-
-        if len(filenames) < (vframes):
-            if left and not right:
-                pad_ratio = vframes - len(filenames)
-                filenames = [filenames[0]] * pad_ratio  + filenames
-            elif right and not left:
-                pad_ratio = vframes - len(filenames)
-                filenames = filenames + [filenames[-1]] * pad_ratio
-            elif right and left:
-                pad_ratio = vframes - len(filenames)
-                if pad_ratio == 1: 
-                    filenames = [filenames[0]] * pad_ratio + filenames
-                else:
-                    filenames = [filenames[0]] * int(pad_ratio/2) + filenames + [filenames[-1]] * int(pad_ratio/2)
 
         for f in filenames:
             img = Image.open(f)
@@ -158,21 +152,26 @@ class CutTypeDataset(Dataset):
         frames = torch.stack(frames, 0)
 
         return frames
-
-    def __len__(self):
-        return (len(self.candidates))
     
-    def resample_video_idx(self, num_frames, original_fps, new_fps):
-        step = float(original_fps) / new_fps
-        if step.is_integer():
-            # optimization: if step is integer, don't need to perform
-            # advanced indexing
-            step = int(step)
-            return slice(None, None, step)
-        idxs = torch.arange(num_frames-1, dtype=torch.float32) * step
-        idxs = idxs.floor().to(torch.int64)
-        
-        return idxs
+    def generate_gaussian_sampling(self, cut_frame_id, window):
+        ids = [int(random.gauss(cut_frame_id, window/3)) for _ in range(self.snippet_size)]
+        ids = [x if x>0 else 0 for x in ids]
+        ids = [x if x<cut_frame_id+window else cut_frame_id+window for x in ids]
+        ids.sort()
+        return ids
+    
+    def generate_unfinorm_sampling(self, cut_frame_id, window):
+        low = cut_frame_id - window
+        high = cut_frame_id + window
+        ids = [int(random.uniform(low, high)) for _ in range(self.snippet_size)]
+        ids.sort()
+        return ids
+
+    def generate_fix_window_sampling(self, cut_frame_id, window):
+        low = cut_frame_id - int(window/2)
+        high = cut_frame_id + int(window/2)
+        ids = list(np.linspace(low, self.snippet_size, high).astype(np.uint8))
+        return ids
 
     def __getitem__(self, idx):
         
@@ -180,123 +179,54 @@ class CutTypeDataset(Dataset):
             pos_delta = np.random.choice(self.pos_delta_range)
         else:
             pos_delta = 0 # exact cut -- left/right shots see same  # frames.
+        
+        clip_name = self.clip_names[idx]
+        clip_path = f'{self.videos_path}/{clip_name}'
+        labels = torch.tensor(self.candidates[clip_name]['labels'])
+        shot_times = self.candidates[clip_name]['shot_times']
+        fps = self.clips_to_fps[clip_name]
+        cut_time = shot_times[1] + pos_delta/fps
+        end_time = shot_times[2]
+        window_time = min(cut_time, end_time-cut_time)
+        window_frames = int(window_time*fps)
+        
+        if self.visual_stream:
+            clip = self.get_clip_from_frames(clip_path, cut_time, window_frames, fps)
+            if self.transform:
+                clip = self.transform(clip)
 
-        label = self.labels[idx]
-                    
-        if label == 1:
-            clip_name = self.candidates[idx][0]
-            fps = self.clips_to_fps[clip_name]
-            left_duration = self.time_span*0.5 + pos_delta/fps
-            start_time = self.candidates[idx][2] - left_duration
-            clip_path = f'{self.videos_path}/{clip_name}'
-            if self.visual_stream:
-                clip = self.get_clip_from_frames(clip_path, start_time, self.time_span, fps)
-                idxs = self.resample_video_idx(self.snippet_size, fps, self.network_fps)
-            if self.audio_stream:
-                audio, rate = self.get_clip_audio(clip_path, start_time, self.time_span)
-                spectogram = self.get_clip_spectogram(audio, rate)
-
-        if label == 0:
-            clip_name_left = self.candidates[idx][0]
-            clip_path_left = f'{self.videos_path}/{clip_name_left}'
-            fps_left = self.clips_to_fps[clip_name_left]
-            left_duration = self.time_span*0.5 + pos_delta/fps_left
-            start_time = self.candidates[idx][2] - left_duration
-
-            clip_name_right = self.candidates[idx][3]
-            clip_path_right = f'{self.videos_path}/{clip_name_right}'
-            fps_right = self.clips_to_fps[clip_name_right]
-            right_duration = self.time_span*0.5 - pos_delta/fps_right
-            end_time = self.candidates[idx][4]
-
-            if self.visual_stream:
-                clip_left = self.get_clip_from_frames(clip_path_left, start_time, left_duration, fps_left, right=False)
-                clip_right = self.get_clip_from_frames(clip_path_right, end_time, right_duration, fps_right, left=False)
-
-                clip = torch.cat((clip_left, clip_right), dim=0)
-                idxs = self.resample_video_idx(self.snippet_size, fps_left, self.network_fps)
-
-            if self.audio_stream:
-                audio_left, rate = self.get_clip_audio(clip_path_left, start_time, left_duration, right=False)
-                audio_right, _ = self.get_clip_audio(clip_path_right, end_time, right_duration, left=False)
-                audio  = np.concatenate((audio_left, audio_right), axis=0)
-                spectogram = self.get_clip_spectogram(audio, rate)
-            clip_name = clip_name_left
-        # write_video(f'examples/{label}/{self.candidates[idx][0]}.mp4',clip[idxs,:,1:,:],self.network_fps)
-        if self.transform and self.visual_stream:
-            clip = self.transform(clip)
+        if self.audio_stream:
+            audio, rate = self.get_clip_audio(clip_path)
+            spectogram = self.get_clip_spectogram(audio, rate)            
         
 
         if self.visual_stream and not self.audio_stream:
-            return clip[:,idxs,:,:], label, clip_name
+            return clip, labels, clip_name
         
         elif not self.visual_stream and self.audio_stream:
-            return spectogram.unsqueeze(0).float(), label, clip_name
+            return spectogram.unsqueeze(0).float(), labels, clip_name
         
         elif self.visual_stream and self.audio_stream:
-            return clip[:,idxs,:,:], spectogram.unsqueeze(0).float(), label, clip_name
+            return clip, spectogram.unsqueeze(0).float(), labels, clip_name
 
 
     def read_cache_candidates(self):
-        dict_cache = json.load(open(self.cache_filename))
-        self.candidates = dict_cache['candidates']
-        self.labels = dict_cache['labels']
+        self.candidates = json.load(open(self.cache_filename))
         print('Candidates readed from cache file')
 
     def set_candidates(self):
         print(f'Setting candidates for {self.mode}')
-        self.candidates = []
-        self.labels = []
-        for idx, row in tqdm.tqdm(self.shots_df.iterrows(),total=len(self.shots_df)):
-            this_candidates = []
-            this_labels = []
-            df = self.shots_df[self.shots_df.video_id==row.video_id]
-            # Find positive candidates
-            if not (row.shot_left_end - row.shot_left_start > 0.8) and (row.shot_right_end- row.shot_right_start > 0.8):
-                continue
+        self.candidates = {}
 
+        for clip_name in tqdm(self.clip_names):
+            row = self.shots_df[self.shots_df.clip_id==clip_name].iloc[0]
             cut_time = (row.shot_left_end + row.shot_right_start)/2
-            positive = [row.clip_id, row.shot_left_start, cut_time, row.clip_id, cut_time, row.shot_right_end]
+            shot_times = [row.shot_left_start, cut_time, row.shot_right_end]
             # Center around zero since annotations come from original scenes
-            positive = [x-row.shot_left_start if type(x)!=str else x for x in positive]
-            this_candidates.append(positive)
-            this_labels.append(1)
-            # Find negative candidates
-            for i in range(self.negative_positive_ratio):  
-                left_found = False
-                while not left_found:
-                    left = df.sample().iloc[0]
-                    if left.shot_left_end - left.shot_left_start > 0.8:
-                        cut_time = (left.shot_left_end + left.shot_right_start)/2
-                        negative_left = [left.clip_id, left.shot_left_start, cut_time]
-                        # Center around zero since annotations come from original scenes
-                        negative = [x-left.shot_left_start if type(x)!=str else x for x in negative_left]
-                        left_found = True
-                right_found = False
-                while not right_found:
-                    right = df.sample().iloc[0]
-                    # sample a different candidate than left
-                    # in case of one shot just allow to repeat
-                    if right.clip_id == left.clip_id and len(df)>1:
-                        continue
-                    if right.shot_left_end - right.shot_left_start > 0.8:
-                        cut_time = (right.shot_left_end + right.shot_right_start)/2
-                        negative_right = [right.clip_id, right.shot_left_start, cut_time]
-                        # Center around zero since annotations come from original scenes
-                        # create the full negative
-                        negative.extend([x-right.shot_left_start if type(x)!=str else x for x in negative_right])
-                        right_found = True
-                # Center around zero since annotations come from original scenes
-                this_candidates.append(negative)
-                this_labels.append(0)
-            self.candidates.extend(this_candidates)
-            self.labels.extend(this_labels)
-
-        if not os.path.exists(self.cache_path):
-            os.makedirs(self.cache_path)
+            shot_times = [x-row.shot_left_start for x in shot_times]
+            self.candidates[clip_name] = {'shot_times':shot_times, 'labels':self.cut_type_annotations[clip_name]['labels']}
 
         print(f'Saving cache candidates file in: {self.cache_filename}')
-        cache = {'candidates':self.candidates, 'labels':self.labels}
         with open(self.cache_filename, 'w') as f:
-            json.dump(cache, f)
+            json.dump(self.candidates, f)
 

@@ -222,6 +222,7 @@ class PretextDataset(Dataset):
                 audio  = np.concatenate((audio_left, audio_right), axis=0)
                 spectogram = self.get_clip_spectogram(audio, rate)
             clip_name = clip_name_left
+        
         # write_video(f'examples/{label}/{self.candidates[idx][0]}.mp4',clip[idxs,:,1:,:],self.network_fps)
         if self.transform and self.visual_stream:
             clip = self.transform(clip)

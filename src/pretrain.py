@@ -49,21 +49,21 @@ def get_transforms(args):
     )
     return transform_train, transform_val
 
-def generate_experiment_name(args):
-    return f'experiment_'\
+def generate_experiment_name_pretrain(args):
+    return f'pretrain_'\
+            f'_from_scratch_{args.pretrain_from_scratch}'\
             f'_audio_{args.audio_stream}'\
             f'_visual_{args.visual_stream}'\
             f'_snippet_{args.snippet_size}'\
-            f'_lr-{args.initial_lr}'\
-            f'_val-neg-ratio-{args.negative_positive_ratio_val}'\
-            f'_batchsize-{args.batch_size}'\
+            f'_lr-{args.pretrain_initial_lr}'\
+            f'_batchsize-{args.pretrain_batch_size}'\
             f'_seed-{args.seed}'
 
 def get_dataloader(args):
     
     transforms_train, transforms_val = get_transforms(args)
 
-    train_dataset = MovieDataset(args.shots_file_name_train,
+    train_dataset = PretextDataset(args.shots_file_names[0],
                     visual_stream=args.visual_stream,
                     audio_stream=args.audio_stream,
                     snippet_size=args.snippet_size,
@@ -71,7 +71,7 @@ def get_dataloader(args):
                     size=(args.scale_w, args.scale_h))
     print(f'Num samples for train: {len(train_dataset)}')
 
-    val_dataset = MovieDataset(args.shots_file_name_val,
+    val_dataset = PretextDataset(args.shots_file_names[1],
                     visual_stream=args.visual_stream,
                     audio_stream=args.audio_stream,
                     snippet_size=args.snippet_size,
@@ -83,14 +83,14 @@ def get_dataloader(args):
 
     train_dataloader = DataLoader(
             train_dataset,
-            batch_size=args.batch_size,
+            batch_size=args.pretrain_batch_size,
             num_workers=args.num_workers,
             pin_memory=True,
             shuffle=False)
 
     val_dataloader = DataLoader(
             val_dataset,
-            batch_size=args.batch_size,
+            batch_size=args.pretrain_batch_size,
             num_workers=args.num_workers,
             pin_memory=True,
             shuffle=False)
@@ -98,38 +98,38 @@ def get_dataloader(args):
     return train_dataloader, val_dataloader
 
 
-class Model(pl.LightningModule):
+class ModelPretrain(pl.LightningModule):
     
     def __init__(self, args, world_size):
         super().__init__()
         self.args = args
-        self.batch_size = self.args.batch_size
+        self.batch_size = self.args.pretrain_batch_size
 
         self.params = None
         
         self.world_size = world_size
-        self.lr = self.args.initial_lr * self.world_size
+        self.lr = self.args.pretrain_initial_lr * self.world_size
 
         if self.args.visual_stream and not self.args.audio_stream:
 
-            self.r2p1d = r2plus1d_18(num_classes=self.args.num_classes)
+            self.r2p1d = r2plus1d_18(num_classes=self.args.pretrain_num_classes)
             self.r2p1d.stem.requires_grad_(False)
-            if not self.args.from_scratch:
+            if not self.args.pretrain_from_scratch:
                 self._load_pretrained(stream='visual')
             self._set_layers_params_video()
             
 
         if not self.args.visual_stream and self.args.audio_stream:
 
-            self.resnet18 = AVENet(model_depth=18, num_classes=self.args.num_classes)
-            if not self.args.from_scratch:
+            self.resnet18 = AVENet(model_depth=18, num_classes=self.args.pretrain_num_classes)
+            if not self.args.pretrain_from_scratch:
                 self._load_pretrained()
             self._set_layers_params_audio()
                    
         
         if self.args.visual_stream and self.args.audio_stream:
-            self.audio_visual_network = AudioVisualModel(num_classes=self.args.num_classes, mlp=True)
-            if not self.args.from_scratch:
+            self.audio_visual_network = AudioVisualModel(num_classes=self.args.pretrain_num_classes, mlp=True)
+            if not self.args.pretrain_from_scratch:
                 self._load_pretrained()
             self._set_layers_params_multi()
              
@@ -214,7 +214,7 @@ class Model(pl.LightningModule):
             (video_chunk, labels, clip_names) = batch
             logits = self.r2p1d(video_chunk)
             loss = self.bce_loss(logits, labels)
-        elif not args.visual_stream and self.args.audio_stream:
+        elif not self.args.visual_stream and self.args.audio_stream:
             (audio_chunk, labels, clip_names) = batch
             logits = self.resnet18(audio_chunk)
             loss = self.bce_loss(logits, labels)
@@ -313,13 +313,13 @@ class Model(pl.LightningModule):
             loss_video = self.bce_loss(out_video, labels)
             loss_multi = self.bce_loss(logits, labels)
             
-            dict_scores = {}
-            for idx, clip_name in enumerate(clip_names):
-                if labels[idx] == 1:
-                    dict_scores[clip_name] = {'audio': out_audio[idx].cpu().numpy().item(), 'visual': out_video[idx].cpu().numpy().item(), 'audio-visual':logits[idx].cpu().numpy().item()}
+            # dict_scores = {}
+            # for idx, clip_name in enumerate(clip_names):
+            #     if labels[idx] == 1:
+            #         dict_scores[clip_name] = {'audio': out_audio[idx].cpu().numpy().item(), 'visual': out_video[idx].cpu().numpy().item(), 'audio-visual':logits[idx].cpu().numpy().item()}
             
-            with open(f'scores/val_scores_batch_{batch_idx}.json', 'w') as f:
-                json.dump(dict_scores, f)
+            # with open(f'scores/val_scores_batch_{batch_idx}.json', 'w') as f:
+            #     json.dump(dict_scores, f)
 
             loss = loss_multi + loss_video + loss_audio
             self.log('Validation_loss_audio', loss_audio, 
@@ -352,7 +352,7 @@ class Model(pl.LightningModule):
                                     weight_decay=self.args.weight_decay)
 
         warmup_iters = self.args.lr_warmup_epochs * len(self._train_dataloader)
-        lr_milestones = [len(self._train_dataloader) * m for m in self.args.lr_milestones]
+        lr_milestones = [len(self._train_dataloader) * m for m in self.args.pretrain_lr_milestones]
 
         lr_scheduler ={'scheduler': WarmupMultiStepLR(optimizer,
                                     milestones=lr_milestones,
@@ -385,15 +385,9 @@ if __name__ == "__main__":
     print(args)
     pl.utilities.seed.seed_everything(args.seed)
 
-    early_stop_callback = EarlyStopping(
-    monitor='Validation_loss',
-    min_delta=0.00,
-    patience=2,
-    verbose=False,
-    mode='min')
     lr_monitor = LearningRateMonitor(logging_interval='step')
 
-    experiment_name = generate_experiment_name(args)
+    experiment_name = generate_experiment_name_pretrain(args)
     tb_logger = pl_loggers.TensorBoardLogger(args.experiments_dir, name=experiment_name)
     
 
@@ -402,16 +396,16 @@ if __name__ == "__main__":
                         check_val_every_n_epoch=1,
                         progress_bar_refresh_rate=1,
                         weights_summary='top',
-                        max_epochs=args.max_epochs,
+                        max_epochs=args.pretrain_max_epochs,
                         logger=tb_logger,
                         callbacks=[lr_monitor],
                         profiler="simple",
                         num_sanity_val_steps=0) 
 
     print(f"Using {trainer.num_gpus} gpus")
-    model = Model(args, world_size=trainer.num_gpus)
+    model = ModelPretrain(args, world_size=trainer.num_gpus)
 
-    if args.test:
+    if args.pretrain_test:
         tester = pl.Trainer(gpus=-1,
                         accelerator='ddp',
                         progress_bar_refresh_rate=1,
@@ -419,7 +413,7 @@ if __name__ == "__main__":
                         profiler="simple",
                         num_sanity_val_steps=0)
 
-        path = args.checkpoint
+        path = args.pretrain_checkpoint
         model_test = Model.load_from_checkpoint(path, args=args, world_size=tester.num_gpus)
         print(f'Testing model from: {path}')
         tester.test(model_test)
