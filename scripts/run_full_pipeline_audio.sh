@@ -24,6 +24,5 @@ CUDA_VISIBLE_DEVICES=1 python src/full_pipeline.py \
                 --num_workers 8 \
                 --finetune_batch_size 20 \
                 --finetune_initial_lr 0.003 \
-                --visual_stream \
                 --audio_stream \
                 --initialization pretrain
