@@ -152,7 +152,7 @@ class ModelPretrain(pl.LightningModule):
             predictions = self.r2p1d(x)
         elif not args.visual_stream and self.args.audio_stream:
             self.resnet18(x)
-        elif args.visual_stream and self.args.audio_stream:
+        elif self.args.visual_stream and self.args.audio_stream:
             pass
         return predictions
 
@@ -273,7 +273,7 @@ class ModelPretrain(pl.LightningModule):
             (video_chunk, labels, clip_names) = batch
             logits = self.r2p1d(video_chunk)
             loss = self.bce_loss(logits, labels)
-        elif not args.visual_stream and self.args.audio_stream:
+        elif not self.args.visual_stream and self.args.audio_stream:
             (audio_chunk, labels, clip_names) = batch
             logits = self.resnet18(audio_chunk)
             loss = self.bce_loss(logits, labels)
@@ -318,7 +318,7 @@ class ModelPretrain(pl.LightningModule):
             (video_chunk, labels, clip_names) = batch
             logits = self.r2p1d(video_chunk)
             loss = self.bce_loss(logits, labels)
-        elif not args.visual_stream and self.args.audio_stream:
+        elif not self.args.visual_stream and self.args.audio_stream:
             (audio_chunk, labels, clip_names) = batch
             logits = self.resnet18(audio_chunk)
             loss = self.bce_loss(logits, labels)
