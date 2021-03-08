@@ -39,7 +39,8 @@ class APClassAnalysis(Callback):
         cnfmat = pl_module.confusion_matrix(sigmoid(all_logits), all_labels).cpu().numpy()
         f1_per_class = pl_module.f1_per_class(sigmoid(all_logits), all_labels).cpu().numpy()
         cut_types = pl_module.cut_types
-        save_dir = f'{trainer.log_dir}/{trainer.logger.name}/class_metrics'
+        save_dir = f'{trainer.log_dir}/class_metrics'
+        print(f'LOOK HERE: {trainer.log_dir}')
         if not os.path.exists(f'{save_dir}'):
             os.makedirs(save_dir)
         np.savetxt(f'{save_dir}/f1_per_class-epoch_{trainer.current_epoch}.txt', f1_per_class, header=str(cut_types), footer=f'Mean: {str(f1_per_class.mean())}')
