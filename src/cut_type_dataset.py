@@ -160,7 +160,7 @@ class CutTypeDataset(Dataset):
         ids.sort()
         return ids
     
-    def generate_unfinorm_sampling(self, cut_frame_id, window):
+    def generate_uniform_sampling(self, cut_frame_id, window):
         low = cut_frame_id - window
         high = cut_frame_id + window
         ids = [int(random.uniform(low, high)) for _ in range(self.snippet_size)]
