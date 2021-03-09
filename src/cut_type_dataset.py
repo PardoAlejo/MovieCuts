@@ -34,6 +34,7 @@ class CutTypeDataset(Dataset):
                  snippet_size=16,
                  time_audio_span=10,
                  data_percent=0.1,
+                 distribution='natural',
                  seed=4165):
         
         self.seed = seed
@@ -55,24 +56,36 @@ class CutTypeDataset(Dataset):
 
         json_file = json.load(open(cut_type_filename))
         self.cut_type_annotations = json_file['annotations']
-
         self.cut_types = json_file['cut_types']
+
         self.clip_names = list(self.cut_type_annotations.keys())
-        if self.mode:
+        if self.mode == 'train':
             num_samples = int(data_percent*len(self.clip_names))
             self.clip_names = random.sample(self.clip_names, k=num_samples)
+
+        self.num_per_class = {x:0 for x in self.cut_types}
+        self.get_number_per_class()
 
         self.visual_stream = visual_stream
         self.audio_stream = audio_stream
         self.snippet_size = snippet_size
         self.time_audio_span = time_audio_span
 
+        self.sampling = sampling
         if sampling=='gaussian':
             self.sampling_function = self.generate_gaussian_sampling
         elif sampling=='uniform':
             self.sampling_function = self.generate_uniform_sampling
         elif sampling=='fixed':
             self.sampling_function = self.generate_fix_window_sampling
+
+        self.distribution = distribution
+        if distribution=='natural':
+            self.weight_per_class = {k:1 for k,_ in self.num_per_class.items()}
+        elif distribution=='uniform':
+            self.weight_per_class = self.get_weights_uniform_distribution()
+        elif distribution == 'sqrt':
+            self.weight_per_class = self.get_weights_sqrt_distribution()
 
         self.augment_spatial_flip = augment_spatial_flip
         self.augment_temporal_shift = augment_temporal_shift
@@ -82,15 +95,20 @@ class CutTypeDataset(Dataset):
         self.clips_to_fps = dict(zip(self.shots_df.clip_id.tolist(),self.shots_df.fps.tolist()))
         
         if self.mode == 'train':
-            self.cache_filename = f'{self.cache_path}/candidates_{self.mode}_cut_type_percent_{int(data_percent*100)}.json'
+            self.cache_filename = f'{self.cache_path}/candidates_{self.mode}_distribution_{self.distribution}_cut_type_percent_{int(data_percent*100)}.json'
         else:
-            self.cache_filename = f'{self.cache_path}/candidates_{self.mode}_cut_type_percent_{int(1*100)}.json'
+            self.cache_filename = f'{self.cache_path}/candidates_{self.mode}_distribution_{self.distribution}_cut_type_percent_{int(1*100)}.json'
         if not os.path.exists(self.cache_filename):
             self.set_candidates()
         else:
             print(f'Cache file found at: {self.cache_filename}')
             self.read_cache_candidates()
 
+        self.num_per_class_pos_sampling = {x:0 for x in self.cut_types}
+        self.get_number_per_class_pos_sampling()
+
+        self.candidate_names = list(self.candidates.keys())
+    
     def __len__(self):
         return (len(self.clip_names))
 
@@ -180,10 +198,14 @@ class CutTypeDataset(Dataset):
         else:
             pos_delta = 0 # exact cut -- left/right shots see same  # frames.
         
-        clip_name = self.clip_names[idx]
+        candidate_name = self.candidate_names[idx]
+        # remove the _cand number from name coming from the repetition of samples on set_candidates
+        clip_name = candidate_name[:36]
         clip_path = f'{self.videos_path}/{clip_name}'
-        labels = torch.tensor(self.candidates[clip_name]['labels'])
-        shot_times = self.candidates[clip_name]['shot_times']
+        labels = torch.tensor(self.candidates[candidate_name]['labels'])
+        # set each label as 1/k for k number of classes of the sample
+        labels = labels/labels.sum()
+        shot_times = self.candidates[candidate_name]['shot_times']
         fps = self.clips_to_fps[clip_name]
         cut_time = shot_times[1] + pos_delta/fps
         end_time = shot_times[2]
@@ -209,6 +231,35 @@ class CutTypeDataset(Dataset):
         elif self.visual_stream and self.audio_stream:
             return clip, spectogram.unsqueeze(0).float(), labels, clip_name
 
+    def get_number_per_class(self):
+        for clip_name in self.clip_names:
+            this_labels = self.cut_type_annotations[clip_name]['labels']
+            this_cut_types = [cut_type for cut_type, label in zip(self.cut_types, this_labels) if label==1]
+            for cut_type in this_cut_types:
+                self.num_per_class[cut_type] += 1
+
+    def get_number_per_class_pos_sampling(self):
+        for clip_name, dic in self.candidates.items():
+            this_labels = dic['labels']
+            this_cut_types = [cut_type for cut_type, label in zip(self.cut_types, this_labels) if label==1]
+            for cut_type in this_cut_types:
+                self.num_per_class_pos_sampling[cut_type] += 1
+
+    def get_weights_uniform_distribution(self):
+        # max_represented_class = max(self.num_per_class.values())
+        # weight_per_class = {k:int(max_represented_class/v) for k,v in self.num_per_class.items()}
+        total_samples = sum(self.num_per_class.values())
+        t = 5e-1
+        weight_per_class = {k:int(t/(v/total_samples)) for k,v in self.num_per_class.items()}
+        return weight_per_class
+
+    def get_weights_sqrt_distribution(self):
+        # max_represented_class = max(self.num_per_class.values())
+        # weight_per_class = {k:int(np.sqrt(max_represented_class/v)) for k,v in self.num_per_class.items()}
+        total_samples = sum(self.num_per_class.values())
+        t = 10e-1
+        weight_per_class = {k:int(np.sqrt(t/(v/total_samples))) for k,v in self.num_per_class.items()}
+        return weight_per_class
 
     def read_cache_candidates(self):
         self.candidates = json.load(open(self.cache_filename))
@@ -217,16 +268,28 @@ class CutTypeDataset(Dataset):
     def set_candidates(self):
         print(f'Setting candidates for {self.mode}')
         self.candidates = {}
-
+        not_labeled_clips = []
         for clip_name in tqdm(self.clip_names):
             row = self.shots_df[self.shots_df.clip_id==clip_name].iloc[0]
             cut_time = (row.shot_left_end + row.shot_right_start)/2
             shot_times = [row.shot_left_start, cut_time, row.shot_right_end]
             # Center around zero since annotations come from original scenes
             shot_times = [x-row.shot_left_start for x in shot_times]
-            self.candidates[clip_name] = {'shot_times':shot_times, 'labels':self.cut_type_annotations[clip_name]['labels']}
+            this_labels = self.cut_type_annotations[clip_name]['labels']
+            this_cut_types = [cut_type for cut_type, label in zip(self.cut_types, this_labels) if label==1]
+            if not this_cut_types:
+                not_labeled_clips.append(clip_name)
+                continue
+            # Find all possible weights and take the minimum, since we don't wanna augment the most represented class
+            num_replicas = min([self.weight_per_class[cut_type] for cut_type in this_cut_types])
+            for i in range(num_replicas):
+                this_sample_name = f'{clip_name}_{i}'
+                self.candidates[this_sample_name] = {'shot_times':shot_times, 'labels':this_labels}
 
         print(f'Saving cache candidates file in: {self.cache_filename}')
         with open(self.cache_filename, 'w') as f:
             json.dump(self.candidates, f)
+
+        with open(f'.cache/not_label_{self.mode}_list.json', 'w') as f:
+            json.dump(not_labeled_clips, f)
 
