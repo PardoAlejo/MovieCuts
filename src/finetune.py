@@ -165,12 +165,8 @@ class ModelFinetune(pl.LightningModule):
         else:
             print('Training from scratch')
             
-        self.f1_train = pl.metrics.F1(num_classes=self.num_classes, average='macro', dist_sync_on_step=True)
-        self.f1_val = pl.metrics.F1(num_classes=self.num_classes, average='macro', dist_sync_on_step=True)
-        self.f1_test = pl.metrics.F1(num_classes=self.num_classes, average='macro', dist_sync_on_step=True)
 
-
-        self.ap_per_class_train = MultilabelAP(num_classes=self.num_classes, dist_sync_on_step=True)
+        self.ap_per_class_train = MultilabelAP(num_classes=self.num_classes)
         self.ap_per_class_val = MultilabelAP(num_classes=self.num_classes, compute_on_step=True)
         self.ap_per_class_test = MultilabelAP(num_classes=self.num_classes, compute_on_step=False)
 
@@ -181,8 +177,8 @@ class ModelFinetune(pl.LightningModule):
         self.confusion_matrix_test = pl.metrics.ConfusionMatrix(num_classes=self.num_classes, normalize='true', compute_on_step=False)
 
         # Report metrics in the state_dict whe checkpointing
-        self.f1_train.persistent(mode=True)
-        self.f1_val.persistent(mode=True)
+        self.ap_per_class_train(mode=True)
+        self.ap_per_class_val(mode=True)
         self.f1_per_class_val.persistent(mode=True)
         self.confusion_matrix_val.persistent(mode=True)
         

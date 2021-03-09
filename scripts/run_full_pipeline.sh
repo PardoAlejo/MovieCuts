@@ -16,14 +16,14 @@ echo `hostname`
 CUDA_VISIBLE_DEVICES=1 python src/full_pipeline.py \
                 --pretrain_from_scratch\
                 --pretrain_initial_lr 0.03\
-                --pretrain_batch_size 20 \
+                --pretrain_batch_size 12 \
                 --pretrain_vbeta 1\
                 --pretrain_abeta 0.1\
                 --pretrain_avbeta 0.1\
                 --finetune_data_percent 0.3 \
                 --distribution uniform \
                 --num_workers 8 \
-                --finetune_batch_size 20 \
+                --finetune_batch_size 12 \
                 --finetune_initial_lr 0.03 \
                 --finetune_vbeta 1 \
                 --finetune_abeta 1 \
