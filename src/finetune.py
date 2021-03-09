@@ -164,7 +164,7 @@ class ModelFinetune(pl.LightningModule):
             print(f'Loaded models from {self.args.pretrain_model_path}')
         else:
             print('Training from scratch')
-            
+
 
         self.ap_per_class_train = MultilabelAP(num_classes=self.num_classes)
         self.ap_per_class_val = MultilabelAP(num_classes=self.num_classes, compute_on_step=True)
@@ -177,8 +177,8 @@ class ModelFinetune(pl.LightningModule):
         self.confusion_matrix_test = pl.metrics.ConfusionMatrix(num_classes=self.num_classes, normalize='true', compute_on_step=False)
 
         # Report metrics in the state_dict whe checkpointing
-        self.ap_per_class_train(mode=True)
-        self.ap_per_class_val(mode=True)
+        self.ap_per_class_train.persistent(mode=True)
+        self.ap_per_class_val.persistent(mode=True)
         self.f1_per_class_val.persistent(mode=True)
         self.confusion_matrix_val.persistent(mode=True)
         
