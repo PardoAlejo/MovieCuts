@@ -93,7 +93,6 @@ if __name__ == "__main__":
                         num_sanity_val_steps=0) 
 
     print(f"Using {trainer_finetune.num_gpus} gpus")
-    print(f'Saving logs and metric at: {trainer_finetune.log_dir}')
     model_finetune = ModelFinetune(args, world_size=trainer_finetune.num_gpus)
 
 

@@ -93,7 +93,8 @@ class CutTypeDataset(Dataset):
 
         self.candidates = None
         self.clips_to_fps = dict(zip(self.shots_df.clip_id.tolist(),self.shots_df.fps.tolist()))
-        
+        self.not_labeled = 0
+
         if self.mode == 'train':
             self.cache_filename = f'{self.cache_path}/candidates_{self.mode}_distribution_{self.distribution}_cut_type_percent_{int(data_percent*100)}.json'
         else:
@@ -108,9 +109,9 @@ class CutTypeDataset(Dataset):
         self.get_number_per_class_pos_sampling()
 
         self.candidate_names = list(self.candidates.keys())
-    
+
     def __len__(self):
-        return (len(self.clip_names))
+        return (len(self.clip_names)-self.not_labeled)
 
     def get_average_shots_per_scene(self):
         num_shots = 0
@@ -279,6 +280,7 @@ class CutTypeDataset(Dataset):
             this_cut_types = [cut_type for cut_type, label in zip(self.cut_types, this_labels) if label==1]
             if not this_cut_types:
                 not_labeled_clips.append(clip_name)
+                self.not_labeled += 1
                 continue
             # Find all possible weights and take the minimum, since we don't wanna augment the most represented class
             if self.mode == 'train':
