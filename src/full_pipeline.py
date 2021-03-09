@@ -19,7 +19,7 @@ if __name__ == "__main__":
     if args.initialization == 'pretrain':
         pretrain_experiment = f'{args.experiments_dir}/{experiment_name_pretrain}/'
     else:
-        pretrain_experiment = f'{args.experiments_dir}/{args.initialization}'
+        pretrain_experiment = f'{args.experiments_dir}/{args.initialization}_audio_{args.audio_stream}_visual_{args.visual_stream}'
 
     print(f'Logs path: {pretrain_experiment}')
 
@@ -73,14 +73,14 @@ if __name__ == "__main__":
 
     ModelCheckpointPretrain = ModelCheckpoint(
                                     dirpath=f'{pretrain_experiment}/{experiment_name_finetune}',
-                                    monitor='Validation_f1',
+                                    monitor='Validation_mAP',
                                     filename='epoch-{epoch}_Valf1-{Validation_f1:1.2f}',
                                     save_top_k=2,
                                     mode='max',
                                     period=2
                                     )
 
-    callbacks=[lr_monitor_finetuning, ModelCheckpointPretrain, ValidationBatchAccumulator(),APClassAnalysis()]
+    callbacks=[lr_monitor_finetuning, ModelCheckpointPretrain, WriteMetricReport()]
     trainer_finetune = pl.Trainer(gpus=-1,
                         accelerator='ddp',
                         check_val_every_n_epoch=1,
@@ -93,6 +93,7 @@ if __name__ == "__main__":
                         num_sanity_val_steps=0) 
 
     print(f"Using {trainer_finetune.num_gpus} gpus")
+    print(f'Saving logs and metric at: {trainer_finetune.log_dir}')
     model_finetune = ModelFinetune(args, world_size=trainer_finetune.num_gpus)
 
 
