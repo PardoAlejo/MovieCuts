@@ -13,7 +13,7 @@ echo `hostname`
 # LRs=(0.01 0.001 0.03 0.003)
 # DEVICES=(0,1 2,3 4,5 6,7)
 
-CUDA_VISIBLE_DEVICES=0 python src/full_pipeline.py \
+CUDA_VISIBLE_DEVICES=0,1 python src/full_pipeline.py \
                 --pretrain_from_scratch\
                 --pretrain_initial_lr 0.03\
                 --pretrain_batch_size 20 \
@@ -22,7 +22,7 @@ CUDA_VISIBLE_DEVICES=0 python src/full_pipeline.py \
                 --pretrain_avbeta 0.1\
                 --finetune_data_percent 0.3 \
                 --distribution uniform \
-                --num_workers 8 \
+                --num_workers 0 \
                 --finetune_batch_size 20 \
                 --finetune_initial_lr 0.03 \
                 --finetune_vbeta 1 \
@@ -30,4 +30,4 @@ CUDA_VISIBLE_DEVICES=0 python src/full_pipeline.py \
                 --finetune_avbeta 1\
                 --visual_stream \
                 --audio_stream \
-                --initialization scracth
+                --initialization scratch
