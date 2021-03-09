@@ -93,7 +93,6 @@ class CutTypeDataset(Dataset):
 
         self.candidates = None
         self.clips_to_fps = dict(zip(self.shots_df.clip_id.tolist(),self.shots_df.fps.tolist()))
-        self.not_labeled = 0
 
         if self.mode == 'train':
             self.cache_filename = f'{self.cache_path}/candidates_{self.mode}_distribution_{self.distribution}_cut_type_percent_{int(data_percent*100)}.json'
@@ -105,13 +104,21 @@ class CutTypeDataset(Dataset):
             print(f'Cache file found at: {self.cache_filename}')
             self.read_cache_candidates()
 
+
         self.num_per_class_pos_sampling = {x:0 for x in self.cut_types}
         self.get_number_per_class_pos_sampling()
 
         self.candidate_names = list(self.candidates.keys())
+        self.not_labeled = []
+
+        if self.mode != 'train':
+            for clip_name in self.clip_names:
+                if clip_name not in self.candidate_names:
+                    self.not_labeled.append(clip_name)
+            
 
     def __len__(self):
-        return (len(self.clip_names)-self.not_labeled)
+        return (len(self.clip_names)-len(self.not_labeled))
 
     def get_average_shots_per_scene(self):
         num_shots = 0
@@ -277,13 +284,13 @@ class CutTypeDataset(Dataset):
             # Center around zero since annotations come from original scenes
             shot_times = [x-row.shot_left_start for x in shot_times]
             this_labels = self.cut_type_annotations[clip_name]['labels']
-            this_cut_types = [cut_type for cut_type, label in zip(self.cut_types, this_labels) if label==1]
-            if not this_cut_types:
+            if max(this_cut_types) == 0:
                 not_labeled_clips.append(clip_name)
                 self.not_labeled += 1
                 continue
             # Find all possible weights and take the minimum, since we don't wanna augment the most represented class
             if self.mode == 'train':
+                this_cut_types = [cut_type for cut_type, label in zip(self.cut_types, this_labels) if label==1]
                 num_replicas = min([self.weight_per_class[cut_type] for cut_type in this_cut_types])
                 for i in range(num_replicas):
                     this_sample_name = f'{clip_name}_{i}'
