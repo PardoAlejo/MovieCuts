@@ -362,7 +362,7 @@ class ModelFinetune(pl.LightningModule):
         labels_metric = labels/(labels.max(dim=1)[0].unsqueeze(-1))
 
         self.f1_per_class_val.update(sigmoid(logits), labels_metric)
-        self.confusion_matrix_val.update(sigmoid(logits), labels_metric)
+        self.confusion_matrix_val.update(sigmoid(logits), labels_metric.type(torch.uint8))
 
         mAP,_ = self.ap_per_class_val(F.softmax(logits,dim=0).unsqueeze(-1), labels_metric)
 
@@ -418,7 +418,7 @@ class ModelFinetune(pl.LightningModule):
         labels_metric = labels/(labels.max(dim=1)[0].unsqueeze(-1))
 
         self.f1_per_class_test(sigmoid(logits), labels_metric)
-        self.confusion_matrix_test(sigmoid(logits), labels_metric)
+        self.confusion_matrix_test(sigmoid(logits), labels_metric.type(torch.uint8))
         
         mAP, _ = self.ap_per_class_val(F.softmax(logits,dim=0).unsqueeze(-1), labels_metric)
         self.log('Test_mAP', 
