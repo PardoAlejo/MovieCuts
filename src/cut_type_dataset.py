@@ -281,10 +281,13 @@ class CutTypeDataset(Dataset):
                 not_labeled_clips.append(clip_name)
                 continue
             # Find all possible weights and take the minimum, since we don't wanna augment the most represented class
-            num_replicas = min([self.weight_per_class[cut_type] for cut_type in this_cut_types])
-            for i in range(num_replicas):
-                this_sample_name = f'{clip_name}_{i}'
-                self.candidates[this_sample_name] = {'shot_times':shot_times, 'labels':this_labels}
+            if self.mode == 'train':
+                num_replicas = min([self.weight_per_class[cut_type] for cut_type in this_cut_types])
+                for i in range(num_replicas):
+                    this_sample_name = f'{clip_name}_{i}'
+                    self.candidates[this_sample_name] = {'shot_times':shot_times, 'labels':this_labels}
+            else:
+                self.candidates[clip_name] = {'shot_times':shot_times, 'labels':this_labels}
 
         print(f'Saving cache candidates file in: {self.cache_filename}')
         with open(self.cache_filename, 'w') as f:
