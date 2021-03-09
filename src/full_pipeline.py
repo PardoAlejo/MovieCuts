@@ -71,16 +71,16 @@ if __name__ == "__main__":
     experiment_name_finetune = generate_experiment_name_finetune(args)
     tb_logger_finetune = pl_loggers.TensorBoardLogger(pretrain_experiment, name=experiment_name_finetune)
 
-    ModelCheckpointPretrain = ModelCheckpoint(
+    ModelCheckpointFinetune = ModelCheckpoint(
                                     dirpath=f'{pretrain_experiment}/{experiment_name_finetune}',
                                     monitor='Validation_mAP',
-                                    filename='epoch-{epoch}_Valf1-{Validation_f1:1.2f}',
+                                    filename='epoch-{epoch}_ValmAP-{Validation_mAP:1.2f}',
                                     save_top_k=2,
                                     mode='max',
                                     period=2
                                     )
 
-    callbacks=[lr_monitor_finetuning, ModelCheckpointPretrain, WriteMetricReport()]
+    callbacks=[lr_monitor_finetuning, ModelCheckpointFinetune, WriteMetricReport()]
     trainer_finetune = pl.Trainer(gpus=-1,
                         accelerator='ddp',
                         check_val_every_n_epoch=1,

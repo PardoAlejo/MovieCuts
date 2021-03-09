@@ -109,16 +109,9 @@ class CutTypeDataset(Dataset):
         self.get_number_per_class_pos_sampling()
 
         self.candidate_names = list(self.candidates.keys())
-        self.not_labeled = []
-
-        if self.mode != 'train':
-            for clip_name in self.clip_names:
-                if clip_name not in self.candidate_names:
-                    self.not_labeled.append(clip_name)
-            
 
     def __len__(self):
-        return (len(self.clip_names)-len(self.not_labeled))
+        return min(len(self.candidate_names),len(self.clip_names))
 
     def get_average_shots_per_scene(self):
         num_shots = 0
@@ -271,7 +264,7 @@ class CutTypeDataset(Dataset):
 
     def read_cache_candidates(self):
         self.candidates = json.load(open(self.cache_filename))
-        print('Candidates readed from cache file')
+        print('Candidates read from cache file')
 
     def set_candidates(self):
         print(f'Setting candidates for {self.mode}')
@@ -284,9 +277,8 @@ class CutTypeDataset(Dataset):
             # Center around zero since annotations come from original scenes
             shot_times = [x-row.shot_left_start for x in shot_times]
             this_labels = self.cut_type_annotations[clip_name]['labels']
-            if max(this_cut_types) == 0:
+            if max(this_labels) == 0:
                 not_labeled_clips.append(clip_name)
-                self.not_labeled += 1
                 continue
             # Find all possible weights and take the minimum, since we don't wanna augment the most represented class
             if self.mode == 'train':

@@ -176,13 +176,6 @@ class ModelFinetune(pl.LightningModule):
         self.f1_per_class_test = pl.metrics.F1(num_classes=self.num_classes, average=None, compute_on_step=False)
         self.confusion_matrix_test = pl.metrics.ConfusionMatrix(num_classes=self.num_classes, normalize='true', compute_on_step=False)
 
-        # Report metrics in the state_dict whe checkpointing
-        self.ap_per_class_train.persistent(mode=True)
-        self.ap_per_class_val.persistent(mode=True)
-        self.f1_per_class_val.persistent(mode=True)
-        self.confusion_matrix_val.persistent(mode=True)
-        
-        
         self.save_hyperparameters()
 
         self.val_logits_epoch = []
