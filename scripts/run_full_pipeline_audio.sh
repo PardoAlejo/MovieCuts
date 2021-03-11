@@ -13,16 +13,20 @@ echo `hostname`
 # LRs=(0.01 0.001 0.03 0.003)
 # DEVICES=(0,1 2,3 4,5 6,7)
 
-CUDA_VISIBLE_DEVICES=1 python src/full_pipeline.py \
+CUDA_VISIBLE_DEVICES=3 python src/full_pipeline.py \
                 --pretrain_from_scratch\
                 --pretrain_initial_lr 0.03\
                 --pretrain_batch_size 20 \
                 --pretrain_vbeta 1\
-                --pretrain_abeta 0.1\
+                --pretrain_abeta 0.01\
                 --pretrain_avbeta 0.1\
-                --finetune_data_percent 0.1 \
+                --finetune_data_percent 0.3 \
+                --distribution natural \
                 --num_workers 8 \
                 --finetune_batch_size 20 \
                 --finetune_initial_lr 0.003 \
+                --finetune_vbeta 1 \
+                --finetune_abeta 1 \
+                --finetune_avbeta 1\
                 --audio_stream \
-                --initialization pretrain
+                --initialization supervised
