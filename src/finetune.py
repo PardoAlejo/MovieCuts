@@ -59,9 +59,9 @@ def generate_experiment_name_finetune(args):
     else:
         epoch = args.epoch
     return f'cut-type_'\
+            f'_gamma_{args.gamma}' \
             f'data-percent_{args.finetune_data_percent}'\
             f'_distribution_{args.distribution}'\
-            f'_epoch-{epoch}' \
             f'_lr-{args.finetune_initial_lr}'\
             f'_loss_weights-v_{args.finetune_vbeta}-a_{args.finetune_abeta}-av-_{args.finetune_avbeta}'\
             f'_batchsize-{args.finetune_batch_size}'
@@ -168,15 +168,12 @@ class ModelFinetune(pl.LightningModule):
             print('Training from scratch')
 
 
-        self.ap_per_class_train = MultilabelAP(num_classes=self.num_classes)
-        self.ap_per_class_val = MultilabelAP(num_classes=self.num_classes, compute_on_step=True)
+        self.ap_per_class_val = MultilabelAP(num_classes=self.num_classes, compute_on_step=False)
         self.ap_per_class_test = MultilabelAP(num_classes=self.num_classes, compute_on_step=False)
 
-        self.f1_per_class_val = pl.metrics.F1(num_classes=self.num_classes, average=None, compute_on_step=False)        
-        self.confusion_matrix_val = pl.metrics.ConfusionMatrix(num_classes=self.num_classes, normalize='true', compute_on_step=False)
-
-        self.f1_per_class_test = pl.metrics.F1(num_classes=self.num_classes, average=None, compute_on_step=False)
-        self.confusion_matrix_test = pl.metrics.ConfusionMatrix(num_classes=self.num_classes, normalize='true', compute_on_step=False)
+        self.f1_per_class_train = pl.metrics.F1(num_classes=self.num_classes, multilabel=True, average='macro', compute_on_step=True)
+        self.f1_per_class_val = pl.metrics.F1(num_classes=self.num_classes, multilabel=True, average=None, compute_on_step=True)        
+        self.f1_per_class_test = pl.metrics.F1(num_classes=self.num_classes, multilabel=True, average=None, compute_on_step=False)
 
         self.save_hyperparameters()
 
@@ -281,9 +278,9 @@ class ModelFinetune(pl.LightningModule):
         elif self.args.audio_stream and self.args.visual_stream:
             (video_chunk, audio_chunk, labels, clip_names) = batch
             logits, out_video, out_audio = self.audio_visual_network(video_chunk, audio_chunk)
-            loss_audio = self.bce_loss(out_audio, labels)
-            loss_video = self.bce_loss(out_video, labels)
-            loss_multi = self.bce_loss(logits, labels)
+            loss_audio = self.focal_loss(out_audio, labels)
+            loss_video = self.focal_loss(out_video, labels)
+            loss_multi = self.focal_loss(logits, labels)
 
             loss = self.beta_audio_visual*loss_multi \
                     + self.beta_visual*loss_video \
@@ -310,9 +307,9 @@ class ModelFinetune(pl.LightningModule):
                     logger=True)
 
         labels_metric = labels/(labels.max(dim=1)[0].unsqueeze(-1))
-        mAP, _ = self.ap_per_class_train(F.softmax(logits,dim=0).unsqueeze(-1), labels_metric)
-        self.log('Training_mAP', 
-                mAP,
+        f1 = self.f1_per_class_train(sigmoid(logits), labels_metric)
+        self.log('Training_F1', 
+                f1,
                 on_epoch=True,
                 on_step=True,
                 prog_bar=True,
@@ -334,9 +331,9 @@ class ModelFinetune(pl.LightningModule):
         elif self.args.audio_stream and self.args.visual_stream:
             (video_chunk, audio_chunk, labels, clip_names) = batch
             logits, out_video, out_audio = self.audio_visual_network(video_chunk, audio_chunk)
-            loss_audio = self.bce_loss(out_audio, labels)
-            loss_video = self.bce_loss(out_video, labels)
-            loss_multi = self.bce_loss(logits, labels)
+            loss_audio = self.focal_loss(out_audio, labels)
+            loss_video = self.focal_loss(out_video, labels)
+            loss_multi = self.focal_loss(logits, labels)
 
             loss = self.beta_audio_visual*loss_multi \
                     + self.beta_visual*loss_video \
@@ -363,10 +360,10 @@ class ModelFinetune(pl.LightningModule):
 
         labels_metric = labels/(labels.max(dim=1)[0].unsqueeze(-1))
 
-        mAP,_ = self.ap_per_class_val(F.softmax(logits,dim=0).unsqueeze(-1), labels_metric)
-
-        self.log('Validation_mAP', 
-                mAP,
+        self.ap_per_class_val.update(sigmoid(logits), labels_metric)
+        f1 = self.f1_per_class_train(sigmoid(logits), labels_metric)
+        self.log('Validation_F1', 
+                f1.mean(),
                 on_epoch=True,
                 prog_bar=True,
                 logger=True)
@@ -416,8 +413,8 @@ class ModelFinetune(pl.LightningModule):
 
         labels_metric = labels/(labels.max(dim=1)[0].unsqueeze(-1))
         
-        self.ap_per_class_test.update(F.softmax(logits,dim=0).unsqueeze(-1), labels_metric)
-        
+        self.ap_per_class_test.update(sigmoid(logits), labels_metric)
+        self.f1_per_class_test.update(sigmoid(logits), labels_metric)
 
         self.inference_logits_epoch.append(logits)
         self.clip_names_epoch.append(clip_names)
@@ -447,11 +444,19 @@ class ModelFinetune(pl.LightningModule):
                 logits,
                 labels.type_as(logits))
         return bce
+
     def cross_entropy_loss(self, logits, labels):
         ce = F.cross_entropy(
             logits,
             labels.type_as(logits))
         return ce
+
+    def focal_loss(self, logits, labels):
+        p = sigmoid(logits)
+        ce_loss = F.binary_cross_entropy_with_logits(logits, labels.type_as(logits), reduction="none")
+        p_t = p * labels + (1 - p) * (1 - labels)
+        loss = ce_loss * ((1 - p_t) ** self.args.gamma)
+        return loss.mean()
 
     def train_dataloader(self):
         return self._train_dataloader

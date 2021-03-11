@@ -81,6 +81,9 @@ def get_params():
                         help='Loss weight for audio finetuning')
     parser.add_argument('--finetune_avbeta', type=float, default=1,
                         help='Loss weight for audio-visual finetuning')
+    parser.add_argument('--gamma', type=float, default=0,
+                        help='Gamma for focal loss')
+
     # Test or load checkpoint
     parser.add_argument('--pretrain_checkpoint', type=str, default='store_true',
                         help='Checkpoint to test or resume')
