@@ -8,6 +8,7 @@ from pytorch_lightning.metrics import Metric
 from pytorch_lightning import metrics
 from pytorch_lightning.metrics.functional.average_precision import _average_precision_compute, _average_precision_update
 import pandas as pd
+import pickle
 
 def sigmoid(X):
     return 1/(1+torch.exp(-X.squeeze()))
@@ -96,3 +97,44 @@ class WriteMetricReport(Callback):
             os.makedirs(save_dir)
         metrics_df.to_csv(f'{save_dir}/metrics-epoch_{trainer.current_epoch}.csv')
         np.savetxt(f'{save_dir}/confustion_matrix_{trainer.current_epoch}.txt', cnfmat)
+
+    def on_test_epoch_end(self, trainer, pl_module):
+        if pl_module.args.finetune_validation:
+            pass
+        else:
+            cnfmat = pl_module.confusion_matrix_val.compute().cpu().numpy()
+            f1_per_class = pl_module.f1_per_class_val.compute().cpu().numpy()
+            mAP, ap_per_class = pl_module.ap_per_class_val.compute()
+
+            #Prepare data to save it
+            accuracys = cnfmat.diagonal().tolist(); accuracys.insert(0,cnfmat.diagonal().mean())
+            accuracys.insert(0,'Acc')
+            f1s = f1_per_class.tolist(); f1s.insert(0,f1_per_class.mean())
+            f1s.insert(0,'f1')
+            aps = ap_per_class.cpu().numpy().tolist(); aps.insert(0,mAP.cpu().numpy())
+            aps.insert(0,'AP')
+            cut_types = pl_module.cut_types
+            headers = ['Metric','Mean']+cut_types
+            metrics_df = pd.DataFrame([accuracys,f1s,aps], columns=headers)
+            save_dir = f'{trainer.log_dir}/{trainer.logger.name}/class_metrics_test'
+            if not os.path.exists(f'{save_dir}'):
+                os.makedirs(save_dir)
+            metrics_df.to_csv(f'{save_dir}/metrics-epoch_{trainer.current_epoch}.csv')
+            np.savetxt(f'{save_dir}/confustion_matrix_{trainer.current_epoch}.txt', cnfmat)
+
+class SaveLogits(Callback):
+    """PyTorch Lightning metric callback."""
+
+    def __init__(self):
+        super().__init__()
+    
+    def on_test_end(self, trainer, pl_module):
+        split = 'test' if pl_module.args.finetune_test else 'val'
+        all_logits = torch.cat(pl_module.inference_logits_epoch).detach().cpu().numpy()
+        clip_names = [name for batch in pl_module.clip_names_epoch for name in batch]
+        logits = dict(zip(clip_names, all_logits))
+        save_dir = f'{trainer.log_dir}'
+        if not os.path.exists(f'{save_dir}'):
+                os.makedirs(save_dir)
+        with open(f'{save_dir}/{split}_logits.pkl', 'wb') as f:
+            pickle.dump(logits,f)

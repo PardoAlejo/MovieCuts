@@ -110,7 +110,7 @@ def get_dataloader(args):
             shuffle=False)
 
     test_dataloader = DataLoader(
-            val_dataset,
+            test_dataset,
             batch_size=args.finetune_batch_size,
             num_workers=args.num_workers,
             pin_memory=True,
@@ -178,8 +178,8 @@ class ModelFinetune(pl.LightningModule):
 
         self.save_hyperparameters()
 
-        self.val_logits_epoch = []
-        self.val_labels_epoch = []
+        self.inference_logits_epoch = []
+        self.clip_names_epoch = []
 
     def forward(self, x):
         if self.args.visual_stream and not self.args.audio_stream:
@@ -380,7 +380,7 @@ class ModelFinetune(pl.LightningModule):
             (video_chunk, labels, clip_names) = batch
             logits = self.r2p1d(video_chunk)
             loss = self.bce_loss(logits, labels)
-        elif not args.visual_stream and self.args.audio_stream:
+        elif not self.args.visual_stream and self.args.audio_stream:
             (audio_chunk, labels, clip_names) = batch
             logits = self.resnet18(audio_chunk)
             loss = self.bce_loss(logits, labels)
@@ -417,16 +417,15 @@ class ModelFinetune(pl.LightningModule):
 
         labels_metric = labels/(labels.max(dim=1)[0].unsqueeze(-1))
 
-        self.f1_per_class_test(sigmoid(logits), labels_metric)
-        self.confusion_matrix_test(sigmoid(logits), labels_metric.type(torch.uint8))
+        self.f1_per_class_test.update(sigmoid(logits), labels_metric)
+        self.confusion_matrix_test.update(sigmoid(logits), labels_metric.type(torch.uint8))
         
-        mAP, _ = self.ap_per_class_val(F.softmax(logits,dim=0).unsqueeze(-1), labels_metric)
-        self.log('Test_mAP', 
-                mAP,
-                on_epoch=True,
-                prog_bar=True,
-                logger=True)
+        self.ap_per_class_test.update(F.softmax(logits,dim=0).unsqueeze(-1), labels_metric)
         
+
+        self.inference_logits_epoch.append(logits)
+        self.clip_names_epoch.append(clip_names)
+
         return logits, labels
 
     def configure_optimizers(self):
@@ -465,7 +464,10 @@ class ModelFinetune(pl.LightningModule):
         return self._val_dataloader
 
     def test_dataloader(self):
-        return self._test_dataloader
+        if self.args.finetune_test:
+            return self._test_dataloader
+        elif self.args.finetune_validation:
+            return self._val_dataloader
 
 
 if __name__ == "__main__":

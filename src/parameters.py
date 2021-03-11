@@ -132,6 +132,8 @@ def get_params():
     # Test or load checkpoint
     parser.add_argument('--finetune_checkpoint', type=str, default='store_true',
                         help='Checkpoint to test or resume')
+    parser.add_argument('--finetune_validation', action='store_true',
+                        help='Checkpoint to validate or resume') 
     parser.add_argument('--finetune_test', action='store_true',
                         help='Checkpoint to test or resume')                    
     

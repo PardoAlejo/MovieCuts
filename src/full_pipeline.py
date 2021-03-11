@@ -80,7 +80,7 @@ if __name__ == "__main__":
                                     period=2
                                     )
 
-    callbacks=[lr_monitor_finetuning, ModelCheckpointFinetune, WriteMetricReport()]
+    callbacks_train=[lr_monitor_finetuning, ModelCheckpointFinetune, WriteMetricReport()]
     trainer_finetune = pl.Trainer(gpus=-1,
                         accelerator='ddp',
                         check_val_every_n_epoch=1,
@@ -88,7 +88,7 @@ if __name__ == "__main__":
                         weights_summary='top',
                         max_epochs=args.finetune_max_epochs,
                         logger=tb_logger_finetune,
-                        callbacks=callbacks,
+                        callbacks=callbacks_train,
                         profiler="simple",
                         num_sanity_val_steps=0) 
 
@@ -96,18 +96,22 @@ if __name__ == "__main__":
     model_finetune = ModelFinetune(args, world_size=trainer_finetune.num_gpus)
 
 
-    if args.finetune_test:
+    if args.finetune_test or args.finetune_validation:
         tester = pl.Trainer(gpus=-1,
                         accelerator='ddp',
                         progress_bar_refresh_rate=1,
                         weights_summary='top',
+                        logger=tb_logger_finetune,
+                        callbacks=[SaveLogits()],
                         profiler="simple",
                         num_sanity_val_steps=0)
 
         path = args.finetune_checkpoint
-        model_test = Model.load_from_checkpoint(path, args=args, world_size=tester.num_gpus)
-        print(f'Testing model from: {path}')
+        model_test = ModelFinetune.load_from_checkpoint(path, args=args, world_size=tester.num_gpus)
+        data_partition = 'Test' if args.finetune_test else 'Validation'
+        print(f'Forwarding on {data_partition} using model from: {path}')
         tester.test(model_test)
+    
     else:
         print(f'Finetuning model with audio: {args.audio_stream} and visual: {args.visual_stream}')
         trainer_finetune.fit(model_finetune)

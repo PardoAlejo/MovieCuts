@@ -12,15 +12,12 @@
 echo `hostname`
 # LRs=(0.01 0.001 0.03 0.003)
 # DEVICES=(0,1 2,3 4,5 6,7)
-
-python src/pretrain.py --shots_file_name_train data/annotated_clips_train.csv \
-                --shots_file_name_val data/annotated_clips_val.csv \
+# 
+CUDA_VISIBLE_DEVICES=0 python src/full_pipeline.py \
                 --num_workers 8 \
-                --batch_size 32 \
-                --initial_lr 0.003 \
-                --negative_positive_ratio_val 1 \
-                --snippet_size 16 \
-                --audio_stream \
+                --finetune_batch_size 80 \
                 --visual_stream \
-                --test \
-                --checkpoint /home/pardogl/LTC-e2e/experiments/experiment__lr-0.003_val-neg-ratio-1_batchsize-20_seed-4165/version_1/checkpoints/epoch=7-step=26454.ckpt
+                --audio_stream \
+                --finetune_validation \
+                --finetune_checkpoint experiments/supervised_audio_True_visual_True/cut-type_data-percent_1.0_distribution_natural_epoch-last_lr-0.03_loss_weights-v_1.0-a_1.0-av-_1.0_batchsize-20/epoch-epoch=7_ValmAP-Validation_mAP=0.46.ckpt \
+                --initialization supervised
