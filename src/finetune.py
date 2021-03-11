@@ -11,10 +11,12 @@ print(sys.path)
 from video_resnet import r2plus1d_18
 from audio_model import AVENet
 from audio_visual_model import AudioVisualModel
+from callbacks import *
 from cut_type_dataset import CutTypeDataset
 from torch.utils.data import DataLoader
 from pytorch_lightning import loggers as pl_loggers
 from pytorch_lightning.callbacks import LearningRateMonitor
+from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
 import pytorch_lightning as pl
 import transforms as T
 from scheduler import WarmupMultiStepLR
@@ -312,7 +314,7 @@ class ModelFinetune(pl.LightningModule):
         self.log('Training_mAP', 
                 mAP,
                 on_epoch=True,
-                on_step=False,
+                on_step=True,
                 prog_bar=True,
                 logger=True)
             
@@ -360,9 +362,6 @@ class ModelFinetune(pl.LightningModule):
                 logger=True)
 
         labels_metric = labels/(labels.max(dim=1)[0].unsqueeze(-1))
-
-        self.f1_per_class_val.update(sigmoid(logits), labels_metric)
-        self.confusion_matrix_val.update(sigmoid(logits), labels_metric.type(torch.uint8))
 
         mAP,_ = self.ap_per_class_val(F.softmax(logits,dim=0).unsqueeze(-1), labels_metric)
 
@@ -416,9 +415,6 @@ class ModelFinetune(pl.LightningModule):
                 logger=True)
 
         labels_metric = labels/(labels.max(dim=1)[0].unsqueeze(-1))
-
-        self.f1_per_class_test.update(sigmoid(logits), labels_metric)
-        self.confusion_matrix_test.update(sigmoid(logits), labels_metric.type(torch.uint8))
         
         self.ap_per_class_test.update(F.softmax(logits,dim=0).unsqueeze(-1), labels_metric)
         
@@ -471,49 +467,61 @@ class ModelFinetune(pl.LightningModule):
 
 
 if __name__ == "__main__":
-
     args = get_params()
+    print('Finetuning with args')
     print(args)
+    # Finetuning
+
+    experiment_dir = f'{args.experiments_dir}/{args.initialization}_audio_{args.audio_stream}_visual_{args.visual_stream}'
+
     pl.utilities.seed.seed_everything(args.seed)
 
-    early_stop_callback = EarlyStopping(
-    monitor='Validation_loss',
-    min_delta=0.00,
-    patience=2,
-    verbose=False,
-    mode='min')
-    lr_monitor = LearningRateMonitor(logging_interval='step')
+    lr_monitor_finetuning = LearningRateMonitor(logging_interval='step')
 
-    experiment_name = generate_experiment_name_finetune(args)
-    tb_logger = pl_loggers.TensorBoardLogger(args.experiments_dir, name=experiment_name)
-    csv_logger = CSVLogger(args.experiments_dir, name="test")
+    experiment_name_finetune = generate_experiment_name_finetune(args)
+    tb_logger_finetune = pl_loggers.TensorBoardLogger(experiment_dir, name=experiment_name_finetune)
 
-    trainer = pl.Trainer(gpus=-1,
+    ModelCheckpointFinetune = ModelCheckpoint(
+                                    dirpath=f'{experiment_dir}/{experiment_name_finetune}',
+                                    monitor='Validation_mAP',
+                                    filename='epoch-{epoch}_ValmAP-{Validation_mAP:1.2f}',
+                                    save_top_k=2,
+                                    mode='max',
+                                    period=2
+                                    )
+
+    callbacks_train=[lr_monitor_finetuning, ModelCheckpointFinetune, WriteMetricReport()]
+    trainer_finetune = pl.Trainer(gpus=-1,
                         accelerator='ddp',
                         check_val_every_n_epoch=1,
                         progress_bar_refresh_rate=1,
                         weights_summary='top',
-                        max_epochs=args.max_epochs,
-                        logger=csv_logger,
-                        callbacks=[lr_monitor],
+                        max_epochs=args.finetune_max_epochs,
+                        logger=tb_logger_finetune,
+                        callbacks=callbacks_train,
                         profiler="simple",
                         num_sanity_val_steps=0) 
 
-    print(f"Using {trainer.num_gpus} gpus")
-    model = ModelFinetune(args, world_size=trainer.num_gpus)
+    print(f"Using {trainer_finetune.num_gpus} gpus")
+    model_finetune = ModelFinetune(args, world_size=trainer_finetune.num_gpus)
 
-    if args.finetune_test:
+
+    if args.finetune_test or args.finetune_validation:
         tester = pl.Trainer(gpus=-1,
                         accelerator='ddp',
                         progress_bar_refresh_rate=1,
                         weights_summary='top',
+                        logger=tb_logger_finetune,
+                        callbacks=[SaveLogits()],
                         profiler="simple",
                         num_sanity_val_steps=0)
 
         path = args.finetune_checkpoint
-        model_test = Model.load_from_checkpoint(path, args=args, world_size=tester.num_gpus)
-        print(f'Testing model from: {path}')
+        model_test = ModelFinetune.load_from_checkpoint(path, args=args, world_size=tester.num_gpus)
+        data_partition = 'Test' if args.finetune_test else 'Validation'
+        print(f'Forwarding on {data_partition} using model from: {path}')
         tester.test(model_test)
+    
     else:
-        print(f'Training model with audio: {args.audio_stream} and visual: {args.visual_stream}')
-        trainer.fit(model)
+        print(f'Finetuning model with audio: {args.audio_stream} and visual: {args.visual_stream}')
+        trainer_finetune.fit(model_finetune)
