@@ -46,7 +46,8 @@ class ResampleLoss(nn.Module):
                  ),
                  reweight_func=None,  # None, 'inv', 'sqrt_inv', 'rebalance', 'CB'
                  weight_norm=None, # None, 'by_instance', 'by_batch'
-                 labels_file='data/cut-type-train.json'):
+                 labels_file='data/cut-type-train.json',
+                 device=None):
         super(ResampleLoss, self).__init__()
 
         assert (use_sigmoid is True) or (partial is False)
@@ -97,10 +98,10 @@ class ResampleLoss(nn.Module):
             'neg_scale'] if 'neg_scale' in logit_reg else 1.0
         init_bias = logit_reg['init_bias'] if 'init_bias' in logit_reg else 0.0
         self.init_bias = - torch.log(
-            self.train_num / self.class_freq - 1) * init_bias / self.neg_scale
+            self.train_num / self.class_freq - 1, device=self.device) * torch.tensor(init_bias,device=self.device) / torch.tensor(self.neg_scale, device=self.device)
 
-        self.freq_inv = torch.ones(self.class_freq.shape) / self.class_freq
-        self.propotion_inv = self.train_num / self.class_freq
+        self.freq_inv = torch.ones(self.class_freq.shape, device=self.device) / self.class_freq
+        self.propotion_inv = self.train_num / torch.tensor(self.class_freq, device=self.device)
 
         # print('\033[1;35m loading from {} | {} | {} | s\033[0;0m'.format(freq_file, reweight_func, logit_reg))
         # print('\033[1;35m rebalance reweighting mapping params: {:.2f} | {:.2f} | {:.2f} \033[0;0m'.format(self.map_alpha, self.map_beta, self.map_gamma))

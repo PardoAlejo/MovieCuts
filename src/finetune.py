@@ -177,7 +177,7 @@ class ModelFinetune(pl.LightningModule):
         self.inference_logits_epoch = []
         self.clip_names_epoch = []
 
-        self.db_loss = ResampleLoss(use_sigmoid=True, reduction='mean', reweight_func='rebalance', weight_norm='by_batch')
+        self.db_loss = ResampleLoss(use_sigmoid=True, reduction='mean', reweight_func='rebalance', weight_norm='by_batch', device=self.device)
 
     def forward(self, x):
         if self.args.visual_stream and not self.args.audio_stream:
