@@ -51,6 +51,7 @@ class ResampleLoss(nn.Module):
         super(ResampleLoss, self).__init__()
 
         assert (use_sigmoid is True) or (partial is False)
+        self.device = device
         self.use_sigmoid = use_sigmoid
         self.partial = partial
         self.loss_weight = loss_weight
@@ -91,17 +92,17 @@ class ResampleLoss(nn.Module):
         
         self.class_freq , self.neg_class_freq =  self.generate_frequencies()
 
-        self.train_num = self.class_freq[0] + self.neg_class_freq[0]
+        self.train_num = torch.tensor(self.class_freq[0] + self.neg_class_freq[0])
         # regularization params
         self.logit_reg = logit_reg
-        self.neg_scale = logit_reg[
-            'neg_scale'] if 'neg_scale' in logit_reg else 1.0
-        init_bias = logit_reg['init_bias'] if 'init_bias' in logit_reg else 0.0
+        self.neg_scale = torch.tensor(logit_reg[
+            'neg_scale']) if 'neg_scale' in logit_reg else torch.tensor(1.0)
+        init_bias = torch.tensor(logit_reg['init_bias']) if 'init_bias' in logit_reg else torch.tensor(0.0)
         self.init_bias = - torch.log(
-            self.train_num / self.class_freq - 1, device=self.device) * torch.tensor(init_bias,device=self.device) / torch.tensor(self.neg_scale, device=self.device)
+            self.train_num / self.class_freq - 1) * init_bias / (self.neg_scale)
 
-        self.freq_inv = torch.ones(self.class_freq.shape, device=self.device) / self.class_freq
-        self.propotion_inv = self.train_num / torch.tensor(self.class_freq, device=self.device)
+        self.freq_inv = torch.ones(self.class_freq.shape) / self.class_freq
+        self.propotion_inv = self.train_num / torch.tensor(self.class_freq)
 
         # print('\033[1;35m loading from {} | {} | {} | s\033[0;0m'.format(freq_file, reweight_func, logit_reg))
         # print('\033[1;35m rebalance reweighting mapping params: {:.2f} | {:.2f} | {:.2f} \033[0;0m'.format(self.map_alpha, self.map_beta, self.map_gamma))
@@ -119,7 +120,7 @@ class ResampleLoss(nn.Module):
             reduction_override if reduction_override else self.reduction)
 
         weight = self.reweight_functions(label)
-
+        weight = weight.type_as(cls_score)
         cls_score, weight = self.logit_reg_functions(label.float(), cls_score, weight)
 
         if self.focal:
@@ -159,9 +160,12 @@ class ResampleLoss(nn.Module):
             elif 'by_batch' in self.weight_norm:
                 weight = weight / torch.max(weight)
 
+        weight = weight.type_as(label)
         return weight
 
     def logit_reg_functions(self, labels, logits, weight=None):
+        self.init_bias = self.init_bias.type_as(logits)
+        self.neg_scale = self.neg_scale.type_as(logits)
         if not self.logit_reg:
             return logits, weight
         if 'init_bias' in self.logit_reg:
@@ -172,13 +176,16 @@ class ResampleLoss(nn.Module):
         return logits, weight
 
     def rebalance_weight(self, gt_labels):
+        self.freq_inv = self.freq_inv.type_as(gt_labels)
         repeat_rate = (gt_labels.float() * self.freq_inv).sum(dim=1, keepdim=True)
         pos_weight = self.freq_inv.clone().detach().unsqueeze(0) / repeat_rate
         # pos and neg are equally treated
         weight = sigmoid(self.map_beta * (pos_weight - self.map_gamma)) + self.map_alpha
+        weight = weight.type_as(gt_labels)
         return weight
 
     def CB_weight(self, gt_labels):
+
         if  'by_class' in self.CB_mode:
             weight = ((1 - self.CB_beta)) / \
                      (1 - torch.pow(self.CB_beta, self.class_freq))
@@ -199,6 +206,7 @@ class ResampleLoss(nn.Module):
                      (1 - torch.pow(self.CB_beta, min_n))
         else:
             raise NameError
+        
         return weight
 
     def RW_weight(self, gt_labels, by_class=True):
