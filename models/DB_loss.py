@@ -96,7 +96,7 @@ class ResampleLoss(nn.Module):
         self.init_bias = - torch.log(
             self.train_num / self.class_freq - 1) * init_bias / self.neg_scale
 
-        self.freq_inv = torch.ones(self.class_freq.shape).cuda() / self.class_freq
+        self.freq_inv = torch.ones(self.class_freq.shape) / self.class_freq
         self.propotion_inv = self.train_num / self.class_freq
 
         # print('\033[1;35m loading from {} | {} | {} | s\033[0;0m'.format(freq_file, reweight_func, logit_reg))
@@ -176,23 +176,23 @@ class ResampleLoss(nn.Module):
 
     def CB_weight(self, gt_labels):
         if  'by_class' in self.CB_mode:
-            weight = torch.tensor((1 - self.CB_beta)).cuda() / \
-                     (1 - torch.pow(self.CB_beta, self.class_freq)).cuda()
+            weight = torch.tensor((1 - self.CB_beta)) / \
+                     (1 - torch.pow(self.CB_beta, self.class_freq))
         elif 'average_n' in self.CB_mode:
             avg_n = torch.sum(gt_labels * self.class_freq, dim=1, keepdim=True) / \
                     torch.sum(gt_labels, dim=1, keepdim=True)
-            weight = torch.tensor((1 - self.CB_beta)).cuda() / \
-                     (1 - torch.pow(self.CB_beta, avg_n)).cuda()
+            weight = torch.tensor((1 - self.CB_beta)) / \
+                     (1 - torch.pow(self.CB_beta, avg_n))
         elif 'average_w' in self.CB_mode:
-            weight_ = torch.tensor((1 - self.CB_beta)).cuda() / \
-                      (1 - torch.pow(self.CB_beta, self.class_freq)).cuda()
+            weight_ = torch.tensor((1 - self.CB_beta)) / \
+                      (1 - torch.pow(self.CB_beta, self.class_freq))
             weight = torch.sum(gt_labels * weight_, dim=1, keepdim=True) / \
                      torch.sum(gt_labels, dim=1, keepdim=True)
         elif 'min_n' in self.CB_mode:
             min_n, _ = torch.min(gt_labels * self.class_freq +
                                  (1 - gt_labels) * 100000, dim=1, keepdim=True)
-            weight = torch.tensor((1 - self.CB_beta)).cuda() / \
-                     (1 - torch.pow(self.CB_beta, min_n)).cuda()
+            weight = torch.tensor((1 - self.CB_beta)) / \
+                     (1 - torch.pow(self.CB_beta, min_n))
         else:
             raise NameError
         return weight
@@ -216,5 +216,5 @@ class ResampleLoss(nn.Module):
             self.pos_frequencies[label_idx_pos] += 1
             self.neg_frequencies[label_idx_neg] += 1
         
-        return torch.from_numpy(self.pos_frequencies).float().cuda(), \
-                torch.from_numpy(self.neg_frequencies).float().cuda()
+        return torch.from_numpy(self.pos_frequencies).float(), \
+                torch.from_numpy(self.neg_frequencies).float()
