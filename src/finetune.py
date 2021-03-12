@@ -11,7 +11,6 @@ print(sys.path)
 from video_resnet import r2plus1d_18
 from audio_model import AVENet
 from audio_visual_model import AudioVisualModel
-from DB_loss import ResampleLoss
 from callbacks import *
 from cut_type_dataset import CutTypeDataset
 from torch.utils.data import DataLoader
@@ -172,16 +171,10 @@ class ModelFinetune(pl.LightningModule):
         self.ap_per_class_val = MultilabelAP(num_classes=self.num_classes, compute_on_step=False)
         self.ap_per_class_test = MultilabelAP(num_classes=self.num_classes, compute_on_step=False)
 
-        self.f1_per_class_train = pl.metrics.F1(num_classes=self.num_classes, multilabel=True, average='macro', compute_on_step=True)
-        self.f1_per_class_val = pl.metrics.F1(num_classes=self.num_classes, multilabel=True, average=None, compute_on_step=True)        
-        self.f1_per_class_test = pl.metrics.F1(num_classes=self.num_classes, multilabel=True, average=None, compute_on_step=False)
-
         self.save_hyperparameters()
 
         self.inference_logits_epoch = []
         self.clip_names_epoch = []
-
-        self.db_loss = ResampleLoss(use_sigmoid=True, reduction='mean', reweight_func='rebalance', weight_norm='by_batch')
 
     def forward(self, x):
         if self.args.visual_stream and not self.args.audio_stream:
@@ -281,9 +274,9 @@ class ModelFinetune(pl.LightningModule):
         elif self.args.audio_stream and self.args.visual_stream:
             (video_chunk, audio_chunk, labels, clip_names) = batch
             logits, out_video, out_audio = self.audio_visual_network(video_chunk, audio_chunk)
-            loss_audio = self.db_loss(out_audio, labels)
-            loss_video = self.db_loss(out_video, labels)
-            loss_multi = self.db_loss(logits, labels)
+            loss_audio = self.focal_loss(out_audio, labels)
+            loss_video = self.focal_loss(out_video, labels)
+            loss_multi = self.focal_loss(logits, labels)
 
             loss = self.beta_audio_visual*loss_multi \
                     + self.beta_visual*loss_video \
@@ -308,15 +301,6 @@ class ModelFinetune(pl.LightningModule):
                     on_epoch=True, 
                     prog_bar=True, 
                     logger=True)
-
-        labels_metric = labels/(labels.max(dim=1)[0].unsqueeze(-1))
-        f1 = self.f1_per_class_train(sigmoid(logits), labels_metric)
-        self.log('Training_F1', 
-                f1,
-                on_epoch=True,
-                on_step=True,
-                prog_bar=True,
-                logger=True)
             
         return loss
 
@@ -364,12 +348,6 @@ class ModelFinetune(pl.LightningModule):
         labels_metric = labels/(labels.max(dim=1)[0].unsqueeze(-1))
 
         self.ap_per_class_val.update(sigmoid(logits), labels_metric)
-        f1 = self.f1_per_class_train(sigmoid(logits), labels_metric)
-        self.log('Validation_F1', 
-                f1.mean(),
-                on_epoch=True,
-                prog_bar=True,
-                logger=True)
         
         return logits, labels
 
@@ -417,8 +395,6 @@ class ModelFinetune(pl.LightningModule):
         labels_metric = labels/(labels.max(dim=1)[0].unsqueeze(-1))
         
         self.ap_per_class_test.update(sigmoid(logits), labels_metric)
-        self.f1_per_class_test.update(sigmoid(logits), labels_metric)
-    
         self.inference_logits_epoch.append(logits)
         self.clip_names_epoch.append(clip_names)
 
@@ -491,10 +467,10 @@ if __name__ == "__main__":
 
     ModelCheckpointFinetune = ModelCheckpoint(
                                     dirpath=f'{experiment_dir}/{experiment_name_finetune}',
-                                    monitor='Validation_mAP',
-                                    filename='epoch-{epoch}_ValmAP-{Validation_mAP:1.2f}',
+                                    monitor='Validation_loss',
+                                    filename='{epoch}_{Validation_loss:1.2f}',
                                     save_top_k=2,
-                                    mode='max',
+                                    mode='min',
                                     period=2
                                     )
 
