@@ -67,17 +67,14 @@ class WriteMetricReport(Callback):
         super().__init__()
     
     def on_validation_epoch_end(self, trainer, pl_module):
-        f1_per_class = pl_module.f1_per_class_val.compute().cpu().numpy()
         mAP, ap_per_class = pl_module.ap_per_class_val.compute()
 
         #Prepare data to save it
-        f1s = f1_per_class.tolist(); f1s.insert(0,f1_per_class.mean())
-        f1s.insert(0,'f1')
         aps = ap_per_class; aps.insert(0,mAP)
         aps.insert(0,'AP')
         cut_types = pl_module.cut_types
         headers = ['Metric','Mean']+cut_types
-        metrics_df = pd.DataFrame([f1s,aps], columns=headers)
+        metrics_df = pd.DataFrame([aps], columns=headers)
         save_dir = f'{trainer.log_dir}/class_metrics'
         if not os.path.exists(f'{save_dir}'):
             os.makedirs(save_dir, exist_ok=True)

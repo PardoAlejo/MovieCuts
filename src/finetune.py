@@ -171,10 +171,6 @@ class ModelFinetune(pl.LightningModule):
         self.ap_per_class_val = MultilabelAP(num_classes=self.num_classes, compute_on_step=False)
         self.ap_per_class_test = MultilabelAP(num_classes=self.num_classes, compute_on_step=False)
 
-        self.f1_per_class_train = pl.metrics.F1(num_classes=self.num_classes, multilabel=True, average='macro', compute_on_step=True)
-        self.f1_per_class_val = pl.metrics.F1(num_classes=self.num_classes, multilabel=True, average=None, compute_on_step=True)        
-        self.f1_per_class_test = pl.metrics.F1(num_classes=self.num_classes, multilabel=True, average=None, compute_on_step=False)
-
         self.save_hyperparameters()
 
         self.inference_logits_epoch = []
@@ -305,15 +301,6 @@ class ModelFinetune(pl.LightningModule):
                     on_epoch=True, 
                     prog_bar=True, 
                     logger=True)
-
-        labels_metric = labels/(labels.max(dim=1)[0].unsqueeze(-1))
-        f1 = self.f1_per_class_train(sigmoid(logits), labels_metric)
-        self.log('Training_F1', 
-                f1,
-                on_epoch=True,
-                on_step=True,
-                prog_bar=True,
-                logger=True)
             
         return loss
 
@@ -361,12 +348,6 @@ class ModelFinetune(pl.LightningModule):
         labels_metric = labels/(labels.max(dim=1)[0].unsqueeze(-1))
 
         self.ap_per_class_val.update(sigmoid(logits), labels_metric)
-        f1 = self.f1_per_class_val(sigmoid(logits), labels_metric)
-        self.log('Validation_F1', 
-                f1.mean(),
-                on_epoch=True,
-                prog_bar=True,
-                logger=True)
         
         return logits, labels
 
@@ -414,7 +395,6 @@ class ModelFinetune(pl.LightningModule):
         labels_metric = labels/(labels.max(dim=1)[0].unsqueeze(-1))
         
         self.ap_per_class_test.update(sigmoid(logits), labels_metric)
-        self.f1_per_class_test.update(sigmoid(logits), labels_metric)
 
         self.inference_logits_epoch.append(logits)
         self.clip_names_epoch.append(clip_names)
