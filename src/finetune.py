@@ -361,7 +361,7 @@ class ModelFinetune(pl.LightningModule):
         labels_metric = labels/(labels.max(dim=1)[0].unsqueeze(-1))
 
         self.ap_per_class_val.update(sigmoid(logits), labels_metric)
-        f1 = self.f1_per_class_train(sigmoid(logits), labels_metric)
+        f1 = self.f1_per_class_val(sigmoid(logits), labels_metric)
         self.log('Validation_F1', 
                 f1.mean(),
                 on_epoch=True,

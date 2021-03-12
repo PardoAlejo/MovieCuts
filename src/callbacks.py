@@ -87,13 +87,10 @@ class WriteMetricReport(Callback):
         if pl_module.args.finetune_validation:
             pass
         else:
-            cnfmat = pl_module.confusion_matrix_val.compute().cpu().numpy()
             f1_per_class = pl_module.f1_per_class_val.compute().cpu().numpy()
             mAP, ap_per_class = pl_module.ap_per_class_val.compute()
 
             #Prepare data to save it
-            accuracys = cnfmat.diagonal().tolist(); accuracys.insert(0,cnfmat.diagonal().mean())
-            accuracys.insert(0,'Acc')
             f1s = f1_per_class.tolist(); f1s.insert(0,f1_per_class.mean())
             f1s.insert(0,'f1')
             aps = ap_per_class.cpu().numpy().tolist(); aps.insert(0,mAP.cpu().numpy())
