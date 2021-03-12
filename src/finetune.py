@@ -468,10 +468,10 @@ if __name__ == "__main__":
 
     ModelCheckpointFinetune = ModelCheckpoint(
                                     dirpath=f'{experiment_dir}/{experiment_name_finetune}',
-                                    monitor='Validation_mAP',
-                                    filename='epoch-{epoch}_ValmAP-{Validation_mAP:1.2f}',
+                                    monitor='Validation_loss',
+                                    filename='{epoch}_{Validation_loss:1.2f}',
                                     save_top_k=2,
-                                    mode='max',
+                                    mode='min',
                                     period=2
                                     )
 
