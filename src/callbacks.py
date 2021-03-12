@@ -43,6 +43,11 @@ class MultilabelAP(Metric):
         self.add_state("target", default=[], dist_reduce_fx=None)
 
     def update(self, preds: torch.Tensor, target: torch.Tensor):
+        if preds.ndim == 1:
+            preds = preds.unsqueeze(0)
+        if target.ndim == 1:
+            target = target.unsqueeze(0)
+            
         self.preds.append(preds)
         self.target.append(target)
 
