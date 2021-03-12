@@ -11,6 +11,7 @@ print(sys.path)
 from video_resnet import r2plus1d_18
 from audio_model import AVENet
 from audio_visual_model import AudioVisualModel
+from DB_loss import ResampleLoss
 from callbacks import *
 from cut_type_dataset import CutTypeDataset
 from torch.utils.data import DataLoader
@@ -176,6 +177,8 @@ class ModelFinetune(pl.LightningModule):
         self.inference_logits_epoch = []
         self.clip_names_epoch = []
 
+        self.db_loss = ResampleLoss(use_sigmoid=True, reduction='mean', reweight_func='rebalance', weight_norm='by_batch')
+
     def forward(self, x):
         if self.args.visual_stream and not self.args.audio_stream:
             predictions = self.r2p1d(x)
@@ -274,9 +277,9 @@ class ModelFinetune(pl.LightningModule):
         elif self.args.audio_stream and self.args.visual_stream:
             (video_chunk, audio_chunk, labels, clip_names) = batch
             logits, out_video, out_audio = self.audio_visual_network(video_chunk, audio_chunk)
-            loss_audio = self.focal_loss(out_audio, labels)
-            loss_video = self.focal_loss(out_video, labels)
-            loss_multi = self.focal_loss(logits, labels)
+            loss_audio = self.db_loss(out_audio, labels)
+            loss_video = self.db_loss(out_video, labels)
+            loss_multi = self.db_loss(logits, labels)
 
             loss = self.beta_audio_visual*loss_multi \
                     + self.beta_visual*loss_video \
@@ -318,9 +321,9 @@ class ModelFinetune(pl.LightningModule):
         elif self.args.audio_stream and self.args.visual_stream:
             (video_chunk, audio_chunk, labels, clip_names) = batch
             logits, out_video, out_audio = self.audio_visual_network(video_chunk, audio_chunk)
-            loss_audio = self.focal_loss(out_audio, labels)
-            loss_video = self.focal_loss(out_video, labels)
-            loss_multi = self.focal_loss(logits, labels)
+            loss_audio = self.db_loss(out_audio, labels)
+            loss_video = self.db_loss(out_video, labels)
+            loss_multi = self.db_loss(logits, labels)
 
             loss = self.beta_audio_visual*loss_multi \
                     + self.beta_visual*loss_video \
