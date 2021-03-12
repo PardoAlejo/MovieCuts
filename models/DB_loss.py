@@ -16,6 +16,9 @@ from torch.nn import Parameter
 from sklearn.manifold import TSNE
 import json
 
+def sigmoid(X):
+    return 1/(1+torch.exp(-X))
+
 class ResampleLoss(nn.Module):
 
     def __init__(self,
@@ -168,26 +171,26 @@ class ResampleLoss(nn.Module):
         return logits, weight
 
     def rebalance_weight(self, gt_labels):
-        repeat_rate = torch.sum( gt_labels.float() * self.freq_inv, dim=1, keepdim=True)
+        repeat_rate = (gt_labels.float() * self.freq_inv).sum(dim=1, keepdim=True)
         pos_weight = self.freq_inv.clone().detach().unsqueeze(0) / repeat_rate
         # pos and neg are equally treated
-        weight = torch.sigmoid(self.map_beta * (pos_weight - self.map_gamma)) + self.map_alpha
+        weight = sigmoid(self.map_beta * (pos_weight - self.map_gamma)) + self.map_alpha
         return weight
 
     def CB_weight(self, gt_labels):
         if  'by_class' in self.CB_mode:
-            weight = torch.tensor((1 - self.CB_beta)) / \
+            weight = ((1 - self.CB_beta)) / \
                      (1 - torch.pow(self.CB_beta, self.class_freq))
         elif 'average_n' in self.CB_mode:
-            avg_n = torch.sum(gt_labels * self.class_freq, dim=1, keepdim=True) / \
-                    torch.sum(gt_labels, dim=1, keepdim=True)
-            weight = torch.tensor((1 - self.CB_beta)) / \
+            avg_n = (gt_labels * self.class_freq).sum(dim=1, keepdim=True) / \
+                    (gt_labels).sum(dim=1, keepdim=True)
+            weight = (1 - self.CB_beta) / \
                      (1 - torch.pow(self.CB_beta, avg_n))
         elif 'average_w' in self.CB_mode:
-            weight_ = torch.tensor((1 - self.CB_beta)) / \
+            weight_ = (1 - self.CB_beta) / \
                       (1 - torch.pow(self.CB_beta, self.class_freq))
-            weight = torch.sum(gt_labels * weight_, dim=1, keepdim=True) / \
-                     torch.sum(gt_labels, dim=1, keepdim=True)
+            weight = (gt_labels * weight_).sum(dim=1, keepdim=True) / \
+                     (gt_labels).sum(dim=1, keepdim=True)
         elif 'min_n' in self.CB_mode:
             min_n, _ = torch.min(gt_labels * self.class_freq +
                                  (1 - gt_labels) * 100000, dim=1, keepdim=True)
@@ -203,8 +206,8 @@ class ResampleLoss(nn.Module):
         else:
             weight = self.propotion_inv
         if not by_class:
-            sum_ = torch.sum(weight * gt_labels, dim=1, keepdim=True)
-            weight = sum_ / torch.sum(gt_labels, dim=1, keepdim=True)
+            sum_ = (weight * gt_labels).sum(dim=1, keepdim=True)
+            weight = sum_ / (gt_labels.sum(dim=1, keepdim=True))
         return weight
     
     def generate_frequencies(self):
