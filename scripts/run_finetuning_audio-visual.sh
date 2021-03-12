@@ -13,11 +13,11 @@ echo `hostname`
 # LRs=(0.01 0.001 0.03 0.003)
 # DEVICES=(0,1 2,3 4,5 6,7)
 
-CUDA_VISIBLE_DEVICES=0,1,2,3 python src/finetune.py \
+CUDA_VISIBLE_DEVICES=1 python -m ipdb src/finetune.py \
                 --finetune_data_percent 1 \
                 --distribution natural \
                 --num_workers 8 \
-                --finetune_batch_size 16 \
+                --finetune_batch_size 12 \
                 --finetune_initial_lr 0.03 \
                 --finetune_vbeta 2 \
                 --finetune_abeta 1 \

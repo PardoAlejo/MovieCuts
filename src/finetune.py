@@ -11,6 +11,7 @@ print(sys.path)
 from video_resnet import r2plus1d_18
 from audio_model import AVENet
 from audio_visual_model import AudioVisualModel
+from DB_loss import ResampleLoss
 from callbacks import *
 from cut_type_dataset import CutTypeDataset
 from torch.utils.data import DataLoader
@@ -60,7 +61,7 @@ def generate_experiment_name_finetune(args):
         epoch = args.epoch
     return f'cut-type_'\
             f'_gamma_{args.gamma}' \
-            f'data-percent_{args.finetune_data_percent}'\
+            f'_data-percent_{args.finetune_data_percent}'\
             f'_distribution_{args.distribution}'\
             f'_lr-{args.finetune_initial_lr}'\
             f'_loss_weights-v_{args.finetune_vbeta}-a_{args.finetune_abeta}-av-_{args.finetune_avbeta}'\
@@ -180,6 +181,8 @@ class ModelFinetune(pl.LightningModule):
         self.inference_logits_epoch = []
         self.clip_names_epoch = []
 
+        self.db_loss = ResampleLoss(use_sigmoid=True, reduction='mean', reweight_func='rebalance', weight_norm='by_batch')
+
     def forward(self, x):
         if self.args.visual_stream and not self.args.audio_stream:
             predictions = self.r2p1d(x)
@@ -278,9 +281,9 @@ class ModelFinetune(pl.LightningModule):
         elif self.args.audio_stream and self.args.visual_stream:
             (video_chunk, audio_chunk, labels, clip_names) = batch
             logits, out_video, out_audio = self.audio_visual_network(video_chunk, audio_chunk)
-            loss_audio = self.focal_loss(out_audio, labels)
-            loss_video = self.focal_loss(out_video, labels)
-            loss_multi = self.focal_loss(logits, labels)
+            loss_audio = self.db_loss(out_audio, labels)
+            loss_video = self.db_loss(out_video, labels)
+            loss_multi = self.db_loss(logits, labels)
 
             loss = self.beta_audio_visual*loss_multi \
                     + self.beta_visual*loss_video \
@@ -415,7 +418,7 @@ class ModelFinetune(pl.LightningModule):
         
         self.ap_per_class_test.update(sigmoid(logits), labels_metric)
         self.f1_per_class_test.update(sigmoid(logits), labels_metric)
-
+    
         self.inference_logits_epoch.append(logits)
         self.clip_names_epoch.append(clip_names)
 
@@ -517,7 +520,7 @@ if __name__ == "__main__":
                         progress_bar_refresh_rate=1,
                         weights_summary='top',
                         logger=tb_logger_finetune,
-                        callbacks=[SaveLogits()],
+                        callbacks=[WriteMetricReport(), SaveLogits()],
                         profiler="simple",
                         num_sanity_val_steps=0)
 

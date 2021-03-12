@@ -13,11 +13,12 @@ echo `hostname`
 # LRs=(0.01 0.001 0.03 0.003)
 # DEVICES=(0,1 2,3 4,5 6,7)
 # 
-CUDA_VISIBLE_DEVICES=0 python src/full_pipeline.py \
+CUDA_VISIBLE_DEVICES=1 python src/finetune.py \
                 --num_workers 8 \
-                --finetune_batch_size 80 \
+                --finetune_batch_size 64\
                 --visual_stream \
-                --audio_stream \
                 --finetune_validation \
-                --finetune_checkpoint experiments/supervised_audio_True_visual_True/cut-type_data-percent_1.0_distribution_natural_epoch-last_lr-0.03_loss_weights-v_1.0-a_1.0-av-_1.0_batchsize-20/epoch-epoch=7_ValmAP-Validation_mAP=0.46.ckpt \
-                --initialization supervised
+                --finetune_checkpoint gcloud_experiments/supervised_audio_True_visual_True/cut-type_gamma_0.5_data-percent_1.0_distribution_natural_epoch-last_lr-0.03_loss_weights-v_0.65-a_0.05-av-_0.3_batchsize-16/epoch-epoch=5_ValmAP-Validation_mAP=0.48.ckpt \
+                --initialization supervised\
+                --experiments_dir gcloud_experiments \
+                --audio_stream \
