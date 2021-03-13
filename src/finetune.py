@@ -160,10 +160,10 @@ class ModelFinetune(pl.LightningModule):
 
             self.resnet18 = AVENet(model_depth=18, num_classes=self.num_classes)
             if self.args.linear_classifier:
-                self.resnet18.layer1.requires_grad_(False)
-                self.resnet18.layer2.requires_grad_(False)
-                self.resnet18.layer3.requires_grad_(False)
-                self.resnet18.layer4.requires_grad_(False)
+                self.resnet18.audnet.layer1.requires_grad_(False)
+                self.resnet18.audnet.layer2.requires_grad_(False)
+                self.resnet18.audnet.layer3.requires_grad_(False)
+                self.resnet18.audnet.layer4.requires_grad_(False)
             self.params = self.resnet18.parameters()
 
         if self.args.visual_stream and self.args.audio_stream:
