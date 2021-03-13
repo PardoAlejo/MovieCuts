@@ -59,7 +59,6 @@ def generate_experiment_name_finetune(args):
     else:
         epoch = args.epoch
     return f'cut-type_'\
-            f'_gamma_{args.gamma}' \
             f'_data-percent_{args.finetune_data_percent}'\
             f'_distribution_{args.distribution}'\
             f'_lr-{args.finetune_initial_lr}'\
