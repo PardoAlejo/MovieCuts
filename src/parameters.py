@@ -125,6 +125,8 @@ def get_params():
                         choices=['pretrain', 'scratch', 'supervised'],
                         help='Start training from scratch,' 
                         ' from pretrain task, or from Kinetics/VGGSound')
+    parser.add_argument('--linear_classifier', action='store_true',
+                        help='Train only a linear classifier on top of frozen features')
     parser.add_argument('--pretrain_model_path', type=str, 
                         default=None,
                         help='pretrained model path') 
