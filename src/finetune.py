@@ -274,9 +274,9 @@ class ModelFinetune(pl.LightningModule):
         elif self.args.audio_stream and self.args.visual_stream:
             (video_chunk, audio_chunk, labels, clip_names) = batch
             logits, out_video, out_audio = self.audio_visual_network(video_chunk, audio_chunk)
-            loss_audio = self.focal_loss(out_audio, labels)
-            loss_video = self.focal_loss(out_video, labels)
-            loss_multi = self.focal_loss(logits, labels)
+            loss_audio = self.bce_loss(out_audio, labels)
+            loss_video = self.bce_loss(out_video, labels)
+            loss_multi = self.bce_loss(logits, labels)
 
             loss = self.beta_audio_visual*loss_multi \
                     + self.beta_visual*loss_video \
@@ -318,9 +318,9 @@ class ModelFinetune(pl.LightningModule):
         elif self.args.audio_stream and self.args.visual_stream:
             (video_chunk, audio_chunk, labels, clip_names) = batch
             logits, out_video, out_audio = self.audio_visual_network(video_chunk, audio_chunk)
-            loss_audio = self.focal_loss(out_audio, labels)
-            loss_video = self.focal_loss(out_video, labels)
-            loss_multi = self.focal_loss(logits, labels)
+            loss_audio = self.bce_loss(out_audio, labels)
+            loss_video = self.bce_loss(out_video, labels)
+            loss_multi = self.bce_loss(logits, labels)
 
             loss = self.beta_audio_visual*loss_multi \
                     + self.beta_visual*loss_video \
