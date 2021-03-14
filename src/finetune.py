@@ -125,6 +125,9 @@ class ModelFinetune(pl.LightningModule):
     def __init__(self, args, world_size):
         super().__init__()
         self.args = args
+        
+        if self.args.linear_classifier:
+            assert self.args.initialization == 'supervised', 'Linear Classifier requires loading pretrained model'
 
         self.beta_visual = args.finetune_vbeta
         self.beta_audio = args.finetune_abeta
@@ -145,12 +148,22 @@ class ModelFinetune(pl.LightningModule):
 
             self.r2p1d = r2plus1d_18(num_classes=self.num_classes)
             self.r2p1d.stem.requires_grad_(False)
+            if self.args.linear_classifier:
+                self.r2p1d.stem.requires_grad_(False)
+                self.r2p1d.layer1.requires_grad_(False)
+                self.r2p1d.layer2.requires_grad_(False)
+                self.r2p1d.layer3.requires_grad_(False)
+                self.r2p1d.layer4.requires_grad_(False)
             self.params = self.r2p1d.parameters()
-            
 
         if not self.args.visual_stream and self.args.audio_stream:
 
             self.resnet18 = AVENet(model_depth=18, num_classes=self.num_classes)
+            if self.args.linear_classifier:
+                self.resnet18.audnet.layer1.requires_grad_(False)
+                self.resnet18.audnet.layer2.requires_grad_(False)
+                self.resnet18.audnet.layer3.requires_grad_(False)
+                self.resnet18.audnet.layer4.requires_grad_(False)
             self.params = self.resnet18.parameters()
 
         if self.args.visual_stream and self.args.audio_stream:
@@ -232,8 +245,8 @@ class ModelFinetune(pl.LightningModule):
         if self.args.visual_stream and not self.args.audio_stream:
             state_dict = self.r2p1d.state_dict()
             for k, v in state.items():
-                if 'fc' in k:
-                    continue
+                # if 'fc' in k:
+                #     continue
                 state_dict.update({k.replace('r2p1d.',''): v})
             self.r2p1d.load_state_dict(state_dict)
             print(f'Loaded visual weights from: {self.args.video_model_path}')
@@ -242,8 +255,8 @@ class ModelFinetune(pl.LightningModule):
             state_dict = self.resnet18.state_dict()
             
             for k, v in state.items():
-                if 'fc' in k:
-                    continue
+                # if 'fc' in k:
+                #     continue
                 state_dict.update({k.replace('resnet18.',''): v})
             self.resnet18.load_state_dict(state_dict)
         
@@ -253,8 +266,8 @@ class ModelFinetune(pl.LightningModule):
             state_dict = self.audio_visual_network.state_dict()
             
             for k, v in state.items():
-                if 'fc_aux' in k or 'fc_final' in k:
-                    continue
+                # if 'fc_aux' in k or 'fc_final' in k:
+                #     continue
                 state_dict.update({k.replace('audio_visual_network.',''): v})
 
             self.audio_visual_network.load_state_dict(state_dict)
