@@ -140,5 +140,20 @@ def get_params():
     parser.add_argument('--finetune_test', action='store_true',
                         help='Checkpoint to test or resume')                    
     
+    #DB Loss
+    parser.add_argument('--focal_on', action='store_true')
+    parser.add_argument('--focal_balance', type=float, default=2.0)
+    parser.add_argument('--focal_gamma', type=float, default=2.0)
+    
+    parser.add_argument('--CB_beta', type=float, default=0.9)
+    parser.add_argument('--CB_mode', type=str, default='average_w',
+                    choices=['by_class', 'average_n', 'average_w', 'min_n'])
+
+    parser.add_argument('--logit_neg_scale', type=float, default=2.0)
+    parser.add_argument('--logit_init_bias', type=float, default=0.05)
+
+    parser.add_argument('--map_alpha', type=float, default=0.1)
+    parser.add_argument('--map_beta', type=float, default=10.0)
+    parser.add_argument('--map_gamma', type=float, default=0.2)
 
     return parser.parse_args()

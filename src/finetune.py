@@ -60,11 +60,14 @@ def generate_experiment_name_finetune(args):
     else:
         epoch = args.epoch
     return f'cut-type_'\
-            f'_gamma_{args.gamma}' \
-            f'_data-percent_{args.finetune_data_percent}'\
-            f'_distribution_{args.distribution}'\
             f'_lr-{args.finetune_initial_lr}'\
-            f'_loss_weights-v_{args.finetune_vbeta}-a_{args.finetune_abeta}-av-_{args.finetune_avbeta}'\
+            f'_CB_beta_{args.CB_beta}'\
+            f'_CB_mode_{args.CB_mode}'\
+            f'_alpha_{args.map_alpha}'\
+            f'_beta_{args.map_alpha}'\
+            f'_gamma_{args.map_alpha}'\
+            f'_neg_scale_{args.logit_neg_scale}'\
+            f'_init_bias_{args.logit_init_bias}'\
             f'_batchsize-{args.finetune_batch_size}'
 
 def get_dataloader(args):
@@ -177,7 +180,18 @@ class ModelFinetune(pl.LightningModule):
         self.inference_logits_epoch = []
         self.clip_names_epoch = []
 
-        self.db_loss = ResampleLoss(use_sigmoid=True, reduction='mean', reweight_func='rebalance', weight_norm='by_batch', device=self.device)
+        focal = dict(focal=args.focal_on, balance_param=args.focal_balance, gamma=args.focal_gamma)
+        CB_loss = dict(CB_beta=args.CB_beta, CB_mode=args.CB_mode)
+        map_param = dict(alpha=args.map_alpha, beta=args.map_beta, gamma=args.map_gamma)
+        logit_reg = dict(neg_scale=args.logit_neg_scale, init_bias=args.logit_init_bias)
+        self.db_loss = ResampleLoss(use_sigmoid=True, 
+                                    reduction='mean', 
+                                    reweight_func='rebalance',
+                                    focal=focal,
+                                    CB_loss=CB_loss,
+                                    map_param=map_param,
+                                    logit_reg=logit_reg,
+                                    device=self.device)
 
     def forward(self, x):
         if self.args.visual_stream and not self.args.audio_stream:

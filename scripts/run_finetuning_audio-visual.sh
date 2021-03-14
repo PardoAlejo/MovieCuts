@@ -19,13 +19,20 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 python src/finetune.py \
                 --num_workers 8 \
                 --finetune_batch_size 16 \
                 --finetune_initial_lr 0.03 \
-                --finetune_vbeta 1 \
-                --finetune_abeta 1 \
-                --finetune_avbeta 1\
+                --finetune_vbeta 0.22 \
+                --finetune_abeta 0.6 \
+                --finetune_avbeta 0.18\
                 --gamma 0 \
-                --finetune_max_epochs 18 \
-                --finetune_lr-milestones 10 15 \
+                --finetune_max_epochs 8 \
+                --finetune_lr-milestones 6 \
                 --visual_stream \
                 --audio_stream \
 		--experiments_dir db_loss_experiments\
-                --initialization supervised
+                --initialization supervised \
+                --CB_beta 0.9\
+                --CB_mode average_w\
+                --logit_neg_scale 2.0\
+                --logit_init_bias 0.05\
+                --map_alpha 0.1\
+                --map_beta 10.0\
+                --map_gamma 0.2

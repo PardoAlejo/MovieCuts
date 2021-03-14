@@ -27,7 +27,7 @@ class ResampleLoss(nn.Module):
                  loss_weight=1.0,
                  partial=False,
                  focal=dict(
-                     focal=True,
+                     focal=False,
                      balance_param=2.0,
                      gamma=2,
                  ),
@@ -36,13 +36,13 @@ class ResampleLoss(nn.Module):
                      CB_mode='average_w'  # 'by_class', 'average_n', 'average_w', 'min_n'
                  ),
                  map_param=dict(
-                     alpha=10.0,
-                     beta=0.2,
-                     gamma=0.1
+                     alpha=0.1,
+                     beta=10.0,
+                     gamma=0.2
                  ),
                  logit_reg=dict(
-                     neg_scale=5.0,
-                     init_bias=0.1
+                     neg_scale=2.0,
+                     init_bias=0.05
                  ),
                  reweight_func=None,  # None, 'inv', 'sqrt_inv', 'rebalance', 'CB'
                  weight_norm=None, # None, 'by_instance', 'by_batch'
