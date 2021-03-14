@@ -168,6 +168,16 @@ class ModelFinetune(pl.LightningModule):
 
         if self.args.visual_stream and self.args.audio_stream:
             self.audio_visual_network = AudioVisualModel(num_classes=self.num_classes, mlp=True)
+            if self.args.linear_classifier:
+                self.audio_visual_network.r2p1d.stem.requires_grad_(False)
+                self.audio_visual_network.r2p1d.layer1.requires_grad_(False)
+                self.audio_visual_network.r2p1d.layer2.requires_grad_(False)
+                self.audio_visual_network.r2p1d.layer3.requires_grad_(False)
+                self.audio_visual_network.r2p1d.layer4.requires_grad_(False)
+                self.audio_visual_network.audnet.layer1.requires_grad_(False)
+                self.audio_visual_network.audnet.layer2.requires_grad_(False)
+                self.audio_visual_network.audnet.layer3.requires_grad_(False)
+                self.audio_visual_network.audnet.layer4.requires_grad_(False)
             self.params = self.audio_visual_network.parameters()
              
         if self.initialization == 'supervised':
