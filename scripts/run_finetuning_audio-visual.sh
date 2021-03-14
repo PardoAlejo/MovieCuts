@@ -34,5 +34,5 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 python src/finetune.py \
                 --logit_neg_scale 2.0\
                 --logit_init_bias 0.05\
                 --map_alpha 0.1\
-                --map_beta 10.0\
-                --map_gamma 0.2
+                --map_beta 20.0\
+                --map_gamma 0.1
