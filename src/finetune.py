@@ -64,7 +64,7 @@ def generate_experiment_name_finetune(args):
             f'_CB_beta_{args.CB_beta}'\
             f'_CB_mode_{args.CB_mode}'\
             f'_alpha_{args.map_alpha}'\
-            f'_beta_{args.map_alpha}'\
+            f'_beta_{args.map_beta}'\
             f'_gamma_{args.map_alpha}'\
             f'_neg_scale_{args.logit_neg_scale}'\
             f'_init_bias_{args.logit_init_bias}'\

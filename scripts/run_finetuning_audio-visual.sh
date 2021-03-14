@@ -24,7 +24,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 python src/finetune.py \
                 --finetune_avbeta 0.18\
                 --gamma 0 \
                 --finetune_max_epochs 8 \
-                --finetune_lr-milestones 6 \
+                --finetune_lr-milestones 4 \
                 --visual_stream \
                 --audio_stream \
 		--experiments_dir db_loss_experiments\
@@ -34,5 +34,5 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 python src/finetune.py \
                 --logit_neg_scale 2.0\
                 --logit_init_bias 0.05\
                 --map_alpha 0.1\
-                --map_beta 20.0\
+                --map_beta 10.0\
                 --map_gamma 0.1
