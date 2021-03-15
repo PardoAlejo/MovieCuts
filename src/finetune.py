@@ -144,6 +144,8 @@ class ModelFinetune(pl.LightningModule):
         self.world_size = world_size
         self.lr = self.args.finetune_initial_lr * self.world_size
 
+        mlp = False if self.args.linear_classifier else True
+
         if self.args.visual_stream and not self.args.audio_stream:
 
             self.r2p1d = r2plus1d_18(num_classes=self.num_classes)
@@ -167,7 +169,7 @@ class ModelFinetune(pl.LightningModule):
             self.params = self.resnet18.parameters()
 
         if self.args.visual_stream and self.args.audio_stream:
-            self.audio_visual_network = AudioVisualModel(num_classes=self.num_classes, mlp=True)
+            self.audio_visual_network = AudioVisualModel(num_classes=self.num_classes, mlp=mlp)
             if self.args.linear_classifier:
                 self.audio_visual_network.r2p1d.stem.requires_grad_(False)
                 self.audio_visual_network.r2p1d.layer1.requires_grad_(False)
@@ -255,8 +257,8 @@ class ModelFinetune(pl.LightningModule):
         if self.args.visual_stream and not self.args.audio_stream:
             state_dict = self.r2p1d.state_dict()
             for k, v in state.items():
-                # if 'fc' in k:
-                #     continue
+                if 'fc' in k:
+                    continue
                 state_dict.update({k.replace('r2p1d.',''): v})
             self.r2p1d.load_state_dict(state_dict)
             print(f'Loaded visual weights from: {self.args.video_model_path}')
@@ -265,8 +267,8 @@ class ModelFinetune(pl.LightningModule):
             state_dict = self.resnet18.state_dict()
             
             for k, v in state.items():
-                # if 'fc' in k:
-                #     continue
+                if 'fc' in k:
+                    continue
                 state_dict.update({k.replace('resnet18.',''): v})
             self.resnet18.load_state_dict(state_dict)
         
@@ -276,8 +278,8 @@ class ModelFinetune(pl.LightningModule):
             state_dict = self.audio_visual_network.state_dict()
             
             for k, v in state.items():
-                # if 'fc_aux' in k or 'fc_final' in k:
-                #     continue
+                if 'fc_aux' in k or 'fc_final' in k:
+                    continue
                 state_dict.update({k.replace('audio_visual_network.',''): v})
 
             self.audio_visual_network.load_state_dict(state_dict)
