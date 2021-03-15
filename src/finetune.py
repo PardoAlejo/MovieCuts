@@ -492,7 +492,7 @@ if __name__ == "__main__":
                                     filename='{epoch}_{Validation_loss:1.2f}',
                                     save_top_k=2,
                                     mode='min',
-                                    period=2
+                                    period=1
                                     )
 
     callbacks_train=[lr_monitor_finetuning, ModelCheckpointFinetune, WriteMetricReport()]
