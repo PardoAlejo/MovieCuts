@@ -17,14 +17,13 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 python src/finetune.py \
                 --finetune_data_percent 1 \
                 --distribution natural \
                 --num_workers 8 \
-                --finetune_batch_size 12 \
+                --finetune_batch_size 16 \
                 --finetune_initial_lr 0.03 \
-                --finetune_vbeta 2 \
-                --finetune_abeta 1 \
-                --finetune_avbeta 2\
-                --gamma 0 \
-                --finetune_max_epochs 18 \
-                --finetune_lr-milestones 10 15 \
+                --finetune_vbeta 0.22 \
+                --finetune_abeta 0.6 \
+                --finetune_avbeta 0.18 \
+                --finetune_max_epochs 9 \
+                --finetune_lr-milestones 7 \
                 --visual_stream \
                 --audio_stream \
                 --initialization supervised
