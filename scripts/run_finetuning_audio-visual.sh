@@ -27,7 +27,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 python src/finetune.py \
                 --finetune_lr-milestones 4 \
                 --visual_stream \
                 --audio_stream \
-		--experiments_dir db_loss_experiments\
+		        --experiments_dir db_loss_experiments\
                 --initialization supervised \
                 --CB_beta 0.9\
                 --CB_mode average_w\

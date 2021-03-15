@@ -154,6 +154,6 @@ def get_params():
 
     parser.add_argument('--map_alpha', type=float, default=0.1)
     parser.add_argument('--map_beta', type=float, default=10.0)
-    parser.add_argument('--map_gamma', type=float, default=0.2)
+    parser.add_argument('--map_gamma', type=float, default=0.1)
 
     return parser.parse_args()
