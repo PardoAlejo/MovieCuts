@@ -13,6 +13,9 @@ def get_params():
                         default=['data/annotated_clips_train.csv', 'data/annotated_clips_val.csv'],
                         help='Shots info')
     
+    parser.add_argument('--window_sampling', type=str, default='gaussian',
+                        choices=['gaussian', 'uniform', 'fixed'])
+
     # Reading arguments
     parser.add_argument("--scale_h", default=128, type=int,
                         help="Scale H to read")
@@ -66,8 +69,9 @@ def get_params():
                         help='Number of classes')
     parser.add_argument('--experiments_dir', type=str, default='experiments',
                         help='Number of classes')
+    
+    
     #Loss Parameters
-
     parser.add_argument('--pretrain_vbeta', type=float, default=1,
                         help='Loss weight for visual pretrain')
     parser.add_argument('--pretrain_abeta', type=float, default=1,

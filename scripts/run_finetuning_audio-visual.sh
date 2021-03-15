@@ -16,7 +16,7 @@ echo `hostname`
 CUDA_VISIBLE_DEVICES=0,1,2,3 python src/finetune.py \
                 --finetune_data_percent 1 \
                 --distribution natural \
-                --num_workers 8 \
+                --num_workers 0 \
                 --finetune_batch_size 16 \
                 --finetune_initial_lr 0.03 \
                 --finetune_vbeta 0.22 \
@@ -35,4 +35,5 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 python src/finetune.py \
                 --logit_init_bias 0.05\
                 --map_alpha 0.1\
                 --map_beta 10.0\
-                --map_gamma 0.1
+                --map_gamma 0.1\
+                --window_sampling gaussian

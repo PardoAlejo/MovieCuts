@@ -60,6 +60,7 @@ def generate_experiment_name_finetune(args):
     else:
         epoch = args.epoch
     return f'cut-type_'\
+            f'_window_sampling_{args.window_sampling}'\
             f'_lr-{args.finetune_initial_lr}'\
             f'_CB_beta_{args.CB_beta}'\
             f'_CB_mode_{args.CB_mode}'\
@@ -78,6 +79,7 @@ def get_dataloader(args):
                     args.cut_type_file_name_train,
                     visual_stream=args.visual_stream,
                     audio_stream=args.audio_stream,
+                    sampling=args.window_sampling,
                     snippet_size=args.snippet_size,
                     data_percent=args.finetune_data_percent,
                     distribution=args.distribution,
@@ -88,6 +90,7 @@ def get_dataloader(args):
                     args.cut_type_file_name_val,
                     visual_stream=args.visual_stream,
                     audio_stream=args.audio_stream,
+                    sampling=args.window_sampling,
                     snippet_size=args.snippet_size,
                     transform=transforms_val)
 
@@ -97,6 +100,7 @@ def get_dataloader(args):
                     args.cut_type_file_name_test,
                     visual_stream=args.visual_stream,
                     audio_stream=args.audio_stream,
+                    sampling=args.window_sampling,
                     snippet_size=args.snippet_size,
                     transform=transforms_val)
     

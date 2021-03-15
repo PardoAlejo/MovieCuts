@@ -189,7 +189,7 @@ class CutTypeDataset(Dataset):
     def generate_fix_window_sampling(self, cut_frame_id, window):
         low = cut_frame_id - int(window/2)
         high = cut_frame_id + int(window/2)
-        ids = list(np.linspace(low, self.snippet_size, high).astype(np.uint8))
+        ids = list(np.linspace(low, high, self.snippet_size).astype(np.uint8))
         return ids
 
     def __getitem__(self, idx):
