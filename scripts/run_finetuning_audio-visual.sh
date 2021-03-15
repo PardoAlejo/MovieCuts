@@ -24,6 +24,7 @@ CUDA_VISIBLE_DEVICES=1 python src/finetune.py \
                 --finetune_avbeta 0.18 \
                 --finetune_max_epochs 9 \
                 --finetune_lr-milestones 7 \
+                --experiments_dir linear_classifier_experiments\
                 --visual_stream \
                 --audio_stream \
                 --initialization supervised \
