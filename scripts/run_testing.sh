@@ -18,7 +18,7 @@ CUDA_VISIBLE_DEVICES=1 python src/finetune.py \
                 --finetune_batch_size 64\
                 --visual_stream \
                 --finetune_validation \
-                --finetune_checkpoint gcloud_experiments/supervised_audio_True_visual_True/cut-type_gamma_0.5_data-percent_1.0_distribution_natural_epoch-last_lr-0.03_loss_weights-v_0.65-a_0.05-av-_0.3_batchsize-16/epoch-epoch=5_ValmAP-Validation_mAP=0.48.ckpt \
+                --finetune_checkpoint best_models/cut-type__lr-0.03_CB_beta_0.9_CB_mode_average_w_alpha_0.1_beta_10.0_gamma_0.1_neg_scale_2.0_init_bias_0.05_batchsize-16/epoch=6_Validation_loss=0.16.ckpt \
                 --initialization supervised\
-                --experiments_dir gcloud_experiments \
+                --experiments_dir best_models \
                 --audio_stream \

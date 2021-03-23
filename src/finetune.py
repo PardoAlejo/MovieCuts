@@ -493,9 +493,8 @@ if __name__ == "__main__":
                                     dirpath=f'{experiment_dir}/{experiment_name_finetune}',
                                     monitor='Validation_loss',
                                     filename='{epoch}_{Validation_loss:1.2f}',
-                                    save_top_k=2,
-                                    mode='min',
-                                    period=2
+                                    save_top_k=-1,
+                                    mode='min'
                                     )
 
     callbacks_train=[lr_monitor_finetuning, ModelCheckpointFinetune, WriteMetricReport()]
