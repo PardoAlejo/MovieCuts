@@ -1,5 +1,5 @@
 # LTC-e2e
-Learning to cut end-to-end pretrained modules
+MovieCuts and Learning to cut end-to-end pretrained modules
 
 ## Requirements
 
