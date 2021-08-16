@@ -13,12 +13,12 @@ echo `hostname`
 # LRs=(0.01 0.001 0.03 0.003)
 # DEVICES=(0,1 2,3 4,5 6,7)
 # 
-CUDA_VISIBLE_DEVICES=1 python src/finetune.py \
+CUDA_VISIBLE_DEVICES=0,1 python src/finetune.py \
                 --num_workers 8 \
-                --finetune_batch_size 64\
-                --visual_stream \
-                --finetune_validation \
-                --finetune_checkpoint best_models/cut-type__lr-0.03_CB_beta_0.9_CB_mode_average_w_alpha_0.1_beta_10.0_gamma_0.1_neg_scale_2.0_init_bias_0.05_batchsize-16/epoch=6_Validation_loss=0.16.ckpt \
+                --finetune_batch_size 48\
+                --finetune_test \
+                --finetune_checkpoint best_models/cut-type__data-percent_1.0_distribution_natural_lr-0.03_loss_weights-v_0.22-a_0.6-av-_0.18_batchsize-16/epoch=6_Validation_loss=0.24.ckpt \
                 --initialization supervised\
-                --experiments_dir best_models \
+                --experiments_dir tested_models \
+                --visual_stream \
                 --audio_stream \

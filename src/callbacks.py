@@ -9,7 +9,7 @@ from pytorch_lightning import metrics
 from pytorch_lightning.metrics.functional.average_precision import _average_precision_compute, _average_precision_update
 import pandas as pd
 import pickle
-from sklearn.metrics import average_precision_score
+from sklearn.metrics import average_precision_score, precision_recall_curve
 
 def sigmoid(X):
     return 1/(1+torch.exp(-X.squeeze()))
@@ -38,7 +38,7 @@ class MultilabelAP(Metric):
 
         self.num_classes = num_classes
         self.pos_label = pos_label
-
+        
         self.add_state("preds", default=[], dist_reduce_fx=None)
         self.add_state("target", default=[], dist_reduce_fx=None)
 
@@ -60,9 +60,9 @@ class MultilabelAP(Metric):
             this_target = target[:,i].detach().cpu() 
             this_ap = average_precision_score(this_target, this_pred) 
             ap_per_class.append(this_ap)
-        
+            
         mAP = np.mean(ap_per_class)
-        return [mAP, ap_per_class]
+        return [mAP, ap_per_class, preds, target]
 
 
 class WriteMetricReport(Callback):
@@ -72,7 +72,7 @@ class WriteMetricReport(Callback):
         super().__init__()
     
     def on_validation_epoch_end(self, trainer, pl_module):
-        mAP, ap_per_class = pl_module.ap_per_class_val.compute()
+        mAP, ap_per_class,_,_ = pl_module.ap_per_class_val.compute()
 
         #Prepare data to save it
         aps = ap_per_class; aps.insert(0,mAP)
@@ -87,7 +87,7 @@ class WriteMetricReport(Callback):
 
     def on_test_epoch_end(self, trainer, pl_module):
 
-        mAP, ap_per_class = pl_module.ap_per_class_test.compute()
+        mAP, ap_per_class, preds, target = pl_module.ap_per_class_test.compute()
 
         #Prepare data to save it
         aps = ap_per_class; aps.insert(0,mAP)
