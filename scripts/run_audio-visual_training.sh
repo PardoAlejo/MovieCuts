@@ -14,7 +14,7 @@ echo `hostname`
 # DEVICES=(0,1 2,3 4,5 6,7)
 
 CUDA_VISIBLE_DEVICES=0,1,2,3 python src/pretrain.py --num_workers 8 \
-                --pretrain_batch_size 20 \
+                --pretrain_batch_size 32 \
                 --pretrain_initial_lr 0.03 \
                 --negative_positive_ratio_val 1 \
                 --snippet_size 16 \

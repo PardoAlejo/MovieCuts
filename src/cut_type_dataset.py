@@ -8,10 +8,15 @@ import ffmpeg
 from PIL import Image
 from scipy import signal
 from tqdm import tqdm
-from torchvision.io import read_video, write_video
+from torchvision.io import read_video, write_video, read_image
 import soundfile as sf
 import json
 import matplotlib.pyplot as plt
+# import sys
+# import os
+# sys.path.insert(1, f'{os.getcwd()}/utils')
+# from wandb import Wandb
+
 
 class CutTypeDataset(Dataset):
     """Construct an untrimmed video classification dataset.
@@ -49,7 +54,9 @@ class CutTypeDataset(Dataset):
         self.shots_df_by_movie_id = self.shots_df.groupby('movie_id')
         self.videos_path = videos_path
         self.cache_path = cache_path
-        
+        if not os.path.exists(self.cache_path):
+            os.makedirs(self.cache_path)
+
         self.data_percent = data_percent
 
         self.transform = transform
@@ -160,15 +167,10 @@ class CutTypeDataset(Dataset):
         frames = []
 
         for f in filenames:
-            img = Image.open(f)
-            img = img.convert('RGB')
+            img = read_image(f)
             frames.append(img)
-            
-        if (self.augment_spatial_flip) & (bool(random.getrandbits(1))):
-            frames = [img.transpose(Image.FLIP_LEFT_RIGHT) for img in frames]
 
-        frames = [torch.from_numpy(np.asarray(img).copy()) for img in frames]
-        frames = torch.stack(frames, 0)
+        frames = torch.stack(frames, 1)
 
         return frames
     

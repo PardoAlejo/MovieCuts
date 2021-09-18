@@ -7,7 +7,6 @@ import torchvision
 import sys
 import os
 sys.path.insert(1, f'{os.getcwd()}/models')
-print(sys.path)
 from video_resnet import r2plus1d_18
 from audio_model import AVENet
 from audio_visual_model import AudioVisualModel
@@ -33,6 +32,7 @@ def get_transforms(args):
     
     transform_train = torchvision.transforms.Compose(        [
                 T.ToTensorVideo(),
+                T.RandomHorizontalFlipVideo(p=0.5),
                 T.Resize((args.scale_h, args.scale_w)),
                 T.NormalizeVideo(
                     mean=(0.43216, 0.394666, 0.37645), std=(0.22803, 0.22145, 0.216989)
@@ -44,6 +44,7 @@ def get_transforms(args):
     transform_val = torchvision.transforms.Compose(
         [
             T.ToTensorVideo(),
+            T.RandomHorizontalFlipVideo(p=0.5),
             T.Resize((args.scale_h, args.scale_w)),
             T.NormalizeVideo(
                 mean=(0.43216, 0.394666, 0.37645), std=(0.22803, 0.22145, 0.216989)
