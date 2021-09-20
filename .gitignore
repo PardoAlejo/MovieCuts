@@ -14,4 +14,4 @@ examples*
 *.json
 *.txt
 *experiments*
-./logs*
+.logs*
