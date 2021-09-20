@@ -1,0 +1,74 @@
+# ---------------------------------------------------------------------------- #
+# data params
+# ---------------------------------------------------------------------------- #
+data:
+  data_root: './data/framed_clips'
+  cache_path: './.cache'
+  cut_type_file_name_train: 'data/cut-type-train.json'
+  cut_type_file_name_val: 'data/cut-type-val.json'
+  cut_type_file_name_test: 'data/cut-type-test.json'
+  scale_h: 128 # Scale H to read
+  scale_w: 180 # Scale W to read
+  crop_size: 112 # crop size to input the network
+  snippet_size: 16 # number of frames per clip
+  num_classes: 10
+  window_sampling: gaussian # choose between ['gaussian', 'uniform', 'fixed']
+  distribution: natural # choose between ['natural', 'uniform', 'sqrt']
+  finetune_data_percent: 1 # *100 percetange of data to train with
+  seed: 4165
+# ---------------------------------------------------------------------------- #
+# Networks params
+# ---------------------------------------------------------------------------- #
+network:
+    visual_stream: True
+    Audio_stream: True
+    num_visual_layers: 18
+    num_audio_layers: 18
+    finetune_abeta: 0.6
+    finetune_avbeta: 0.18
+    finetune_vbeta: 0.22
+# ---------------------------------------------------------------------------- #
+# Training options
+# ---------------------------------------------------------------------------- #
+
+inference:
+  validation: False # batch size Per GPU
+  testing: True
+  checkpoint: ''
+# ---------------------------------------------------------------------------- #
+# Inference options
+# ---------------------------------------------------------------------------- #
+
+training:
+  finetune_batch_size: 32 # batch size Per GPU
+  num_workers: 16
+  finetune_max_epochs: 8
+  finetune_lr_milestones:
+  - 4
+  - 6
+  initialization: supervised #['scratch', 'supervised']
+  print_freq: 1
+  val_freq: 1
+
+optimizer:
+  name: 'sgd'
+  weight_decay: 0.0001
+  momentum: 0.9
+
+lr_scheduler:
+  lr_decay: 0.9
+  finetune_initial_lr: 0.01  # for 1 GPU and batch size 8. have to manually change when increase the number of GPUs or Batch size.
+  finetune_warmup_epochs: 1
+  finetune_lr_gamma: 0.5
+
+pretrain:
+  pretrain_from_scratch: False
+  video_model_path: 'model_checkpoints/r2plus1d_18-91a641e6.pth'
+  audio_model_path: 'model_checkpoints/vggsound_avgpool.pth.tar'
+# ---------------------------------------------------------------------------- #
+# logging
+# ---------------------------------------------------------------------------- #
+log_dir: './log/dbloss'
+wandb:
+  project: moviecuts  # name of the wandb project
+  entity: pardoalejo  # *will automatically merge with the parent yaml*
