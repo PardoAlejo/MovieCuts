@@ -12,11 +12,7 @@ from torchvision.io import read_video, write_video, read_image
 import soundfile as sf
 import json
 import matplotlib.pyplot as plt
-# import sys
-# import os
-# sys.path.insert(1, f'{os.getcwd()}/utils')
-# from wandb import Wandb
-
+import logging
 
 class CutTypeDataset(Dataset):
     """Construct an untrimmed video classification dataset.
@@ -108,10 +104,10 @@ class CutTypeDataset(Dataset):
         if not os.path.exists(self.cache_filename):
             self.set_candidates()
         else:
-            print(f'Cache file found at: {self.cache_filename}')
+            logging.info(f'Cache file found at: {self.cache_filename}')
             self.read_cache_candidates()
 
-
+        logging.info(f"Number of candidates for {self.mode}: {len(self.candidates)}")
         self.num_per_class_pos_sampling = {x:0 for x in self.cut_types}
         self.get_number_per_class_pos_sampling()
 
@@ -266,10 +262,10 @@ class CutTypeDataset(Dataset):
 
     def read_cache_candidates(self):
         self.candidates = json.load(open(self.cache_filename))
-        print('Candidates read from cache file')
+        logging.info('Candidates read from cache file')
 
     def set_candidates(self):
-        print(f'Setting candidates for {self.mode}')
+        logging.info(f'Setting candidates for {self.mode}')
         self.candidates = {}
         not_labeled_clips = []
         for clip_name in tqdm(self.clip_names):
@@ -292,7 +288,7 @@ class CutTypeDataset(Dataset):
             else:
                 self.candidates[clip_name] = {'shot_times':shot_times, 'labels':this_labels}
 
-        print(f'Saving cache candidates file in: {self.cache_filename}')
+        logging.info(f'Saving cache candidates file in: {self.cache_filename}')
         with open(self.cache_filename, 'w') as f:
             json.dump(self.candidates, f)
 
