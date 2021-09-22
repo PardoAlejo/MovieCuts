@@ -30,7 +30,7 @@ class CutTypeDataset(Dataset):
                  visual_stream=True,
                  audio_stream=True,
                  transform=None,
-                 videos_path = 'data/framed_clips',
+                 videos_path = '/ibex/ai/project/c2114/data/movies/framed_clips',
                  cache_path = './.cache',
                  augment_temporal_shift=True,
                  pos_delta_range=list(range(5)),
