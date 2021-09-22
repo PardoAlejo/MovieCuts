@@ -5,8 +5,7 @@ Modified from torch-Points3d: https://github.com/nicolas-chaulet/torch-points3d/
 import shutil
 import os
 import subprocess
-# import torch.distributed as dist
-
+import os.path as osp
 
 class WandbUrls:
     def __init__(self, url):
@@ -31,7 +30,6 @@ class WandbUrls:
         msg += "=================================================================================================================================\n"
         return msg
 
-
 class Wandb:
     IS_ACTIVE = False
 
@@ -47,7 +45,7 @@ class Wandb:
             wandb_args[name] = var
 
     @staticmethod
-    def launch(cfg, launch: bool):
+    def launch(cfg, opt, launch: bool):
         if launch:
             import wandb
 
@@ -77,7 +75,8 @@ class Wandb:
                 "gitdiff": gitdiff
             }
             # if dist.get_rank() == 0:
-            wandb.init(**wandb_args, sync_tensorboard=True)  # this is the core command to init wandb
+            
+            wandb.init(**wandb_args, group=osp.splitext(osp.basename(opt.cfg))[0], dir=cfg.log_dir, sync_tensorboard=True)  # this is the core command to init wandb
             wandb.save(os.path.join(os.getcwd(), cfg.cfg_path))
 
     @staticmethod

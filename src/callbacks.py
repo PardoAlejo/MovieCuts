@@ -2,17 +2,25 @@ from typing import Any, List, Optional, Union
 from pytorch_lightning import Callback
 import torch
 import numpy as np
-import os
+import json, logging, glob, pathlib, pickle, os, sys
+import os.path as osp
+sys.path.insert(1, f'{os.getcwd()}/utils')
+from wandb_utils import Wandb
+from config import config
 from torch.nn import functional as F
+import torch.distributed as dist
 from pytorch_lightning.metrics import Metric
 from pytorch_lightning import metrics
 import pandas as pd
-import pickle
 from sklearn.metrics import average_precision_score
+import wandb 
 
 def sigmoid(X):
     return 1/(1+torch.exp(-X.squeeze()))
 
+def get_experiment_version(config):
+    versions = glob.glob(f'{config.exp_dir}/{config.exp_name}/verions_*')
+    return len(versions)
 
 class MultilabelAP(Metric):
     def __init__(
@@ -118,3 +126,69 @@ class SaveLogits(Callback):
                 os.makedirs(save_dir, exist_ok=True)
         with open(f'{save_dir}/{split}_logits.pkl', 'wb') as f:
             pickle.dump(logits,f)
+
+class wandb_config(Callback):
+    """Initialize WANDB and Config options"""
+    def __init__(self, opt, config):
+        self.config = config
+        self.opt = opt
+        super().__init__()
+        
+    def on_init_start(self, trainer):
+        
+        if trainer.is_global_zero:
+            config = self.config
+            version_num = get_experiment_version(config)
+            logging.info(osp.join(config.exp_dir, config.exp_name, f'version_{version_num}'))
+            config.log_dir = osp.join(config.exp_dir, config.exp_name, f'version_{version_num}')
+            config.ckpt_dir = os.path.join(config.log_dir, 'checkpoints')
+            config.code_dir = os.path.join(config.log_dir, 'code')
+            pathlib.Path(config.log_dir).mkdir(parents=True, exist_ok=True)
+            pathlib.Path(config.ckpt_dir).mkdir(parents=True, exist_ok=True)
+            pathlib.Path(config.code_dir).mkdir(parents=True, exist_ok=True)
+
+            opt = self.opt
+            config = self.config
+        
+            # dump the config to one file
+            cfg_path = os.path.join(config.log_dir, "config.json")
+            with open(cfg_path, 'w') as f:
+                json.dump(vars(opt), f, indent=2)
+                json.dump(vars(config), f, indent=2)
+                os.system('cp %s %s' % (opt.cfg, config.log_dir))
+            config.cfg_path = cfg_path
+
+            # set up logging
+            self.setup_logger()
+            logging.info(config)
+            # init wandb *FIRST*
+            if config.wandb.use_wandb:
+                assert config.wandb.entity is not None
+                Wandb.launch(config, self.opt, config.wandb.use_wandb)
+                logging.info(f"Launch wandb, entity: {config.wandb.entity}")
+
+
+    def setup_logger(self):
+        """
+        Configure logger on given level. Logging will occur on standard
+        output and in a log file saved in model_dir.
+        """
+        loglevel = self.config.get('loglevel', 'INFO')  # Here, give a default value if there is no definition
+        numeric_level = getattr(logging, loglevel.upper(), None)
+        if not isinstance(numeric_level, int):
+            raise ValueError('Invalid log level: {}'.format(loglevel))
+
+        log_format = logging.Formatter('%(asctime)s %(message)s')
+        logger = logging.getLogger()
+        logger.setLevel(numeric_level)
+
+        file_handler = logging.FileHandler(osp.join(self.config.log_dir,
+                                                    f'{osp.basename(self.config.log_dir)}.log'))
+        file_handler.setFormatter(log_format)
+        logger.addHandler(file_handler)
+
+        file_handler = logging.StreamHandler(sys.stdout)
+        file_handler.setFormatter(log_format)
+        logger.addHandler(file_handler)
+        logging.root = logger
+        logging.info(f"save log, checkpoint and code to: {self.config.log_dir}")

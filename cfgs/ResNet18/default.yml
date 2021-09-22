@@ -2,8 +2,10 @@
 # data params
 # ---------------------------------------------------------------------------- #
 data:
-  data_root: './data/framed_clips'
+  videos_path: './data/framed_clips'
   cache_path: './.cache'
+  shots_file_train: 'data/annotated_clips_train.csv'
+  shots_file_val: 'data/annotated_clips_val.csv'
   cut_type_file_name_train: 'data/cut-type-train.json'
   cut_type_file_name_val: 'data/cut-type-val.json'
   cut_type_file_name_test: 'data/cut-type-test.json'
@@ -14,41 +16,54 @@ data:
   num_classes: 10
   window_sampling: gaussian # choose between ['gaussian', 'uniform', 'fixed']
   distribution: natural # choose between ['natural', 'uniform', 'sqrt']
-  finetune_data_percent: 1 # *100 percetange of data to train with
-  seed: 4165
+  data_percent: 1 # *100 percetange of data to train with
+
 # ---------------------------------------------------------------------------- #
 # Networks params
 # ---------------------------------------------------------------------------- #
-network:
+model:
     visual_stream: True
-    Audio_stream: True
+    audio_stream: True
     num_visual_layers: 18
     num_audio_layers: 18
-    finetune_abeta: 0.6
-    finetune_avbeta: 0.18
-    finetune_vbeta: 0.22
-# ---------------------------------------------------------------------------- #
-# Training options
-# ---------------------------------------------------------------------------- #
-
-inference:
-  validation: False # batch size Per GPU
-  testing: True
-  checkpoint: ''
+    abeta: 0.6
+    avbeta: 0.18
+    vbeta: 0.22
 # ---------------------------------------------------------------------------- #
 # Inference options
 # ---------------------------------------------------------------------------- #
 
+inference:
+  print_freq: 1
+  validation: False 
+  test: True
+  checkpoint: ''
+  sanity_check_steps: 0
+
+# ---------------------------------------------------------------------------- #
+# Training options
+# ---------------------------------------------------------------------------- #
+
 training:
-  finetune_batch_size: 32 # batch size Per GPU
   num_workers: 16
-  finetune_max_epochs: 8
-  finetune_lr_milestones:
-  - 4
-  - 6
+  max_epochs: 10
   initialization: supervised #['scratch', 'supervised']
   print_freq: 1
   val_freq: 1
+  save_freq: 1
+  save_top_k: 2
+
+  from_scratch: False
+  video_model_path: 'model_checkpoints/r2plus1d_18-91a641e6.pth'
+  audio_model_path: 'model_checkpoints/vggsound_avgpool.pth.tar'
+  
+  sanity_check_steps: 0
+
+# ---------------------------------------------------------------------------- #
+# Optimizer/ Scheduler options
+# ---------------------------------------------------------------------------- #
+batch_size: 32 # batch size Per GPU
+num_workers: 16
 
 optimizer:
   name: 'sgd'
@@ -57,18 +72,18 @@ optimizer:
 
 lr_scheduler:
   lr_decay: 0.9
-  finetune_initial_lr: 0.01  # for 1 GPU and batch size 8. have to manually change when increase the number of GPUs or Batch size.
-  finetune_warmup_epochs: 1
-  finetune_lr_gamma: 0.5
+  initial_lr: 0.01  # for 1 GPU and batch size 8. have to manually change when increase the number of GPUs or Batch size.
+  warmup_epochs: 1
+  lr_gamma: 0.5
+  lr_milestones:
+  - 6
+  - 8
 
-pretrain:
-  pretrain_from_scratch: False
-  video_model_path: 'model_checkpoints/r2plus1d_18-91a641e6.pth'
-  audio_model_path: 'model_checkpoints/vggsound_avgpool.pth.tar'
 # ---------------------------------------------------------------------------- #
 # logging
 # ---------------------------------------------------------------------------- #
 log_dir: './log/dbloss'
+base_exp_dir: './experiments'
 wandb:
   project: moviecuts  # name of the wandb project
   entity: pardoalejo  # *will automatically merge with the parent yaml*

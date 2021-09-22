@@ -1,4 +1,4 @@
-db_loss:
+dbloss:
   focal_on: False
   focal_balance: 2.0
   focal_gamma: 2.0
@@ -6,9 +6,10 @@ db_loss:
   CB_beta: 0.9
   CB_mode: 'average_2' #options ['by_class', 'average_n', 'average_w', 'min_n']
 
-  logits_neg_scale: 2.0
+  logit_neg_scale: 2.0
   logit_init_bias: 0.05
 
   map_alpha: 0.1
   map_beta: 10.0
   map_gamma: 0.1
+
