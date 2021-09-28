@@ -76,7 +76,11 @@ class Wandb:
             }
             # if dist.get_rank() == 0:
             
-            wandb.init(**wandb_args, group=osp.splitext(osp.basename(opt.cfg))[0], dir=cfg.log_dir, sync_tensorboard=True)  # this is the core command to init wandb
+            wandb.init(**wandb_args, 
+            group=osp.splitext(osp.basename(opt.cfg))[0],
+            dir=cfg.log_dir,
+            sync_tensorboard=True)  # this is the core command to init wandb
+            
             wandb.save(os.path.join(os.getcwd(), cfg.cfg_path))
 
     @staticmethod

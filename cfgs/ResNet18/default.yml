@@ -46,7 +46,7 @@ inference:
 
 training:
   num_workers: 16
-  max_epochs: 10
+  max_epochs: 20
   initialization: supervised #['scratch', 'supervised']
   print_freq: 1
   val_freq: 1
@@ -62,7 +62,7 @@ training:
 # ---------------------------------------------------------------------------- #
 # Optimizer/ Scheduler options
 # ---------------------------------------------------------------------------- #
-batch_size: 32 # batch size Per GPU
+batch_size: 96 # batch size Per GPU
 num_workers: 16
 
 optimizer:
@@ -76,8 +76,7 @@ lr_scheduler:
   warmup_epochs: 1
   lr_gamma: 0.5
   lr_milestones:
-  - 6
-  - 8
+  - 7
 
 # ---------------------------------------------------------------------------- #
 # logging

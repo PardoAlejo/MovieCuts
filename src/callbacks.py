@@ -19,7 +19,8 @@ def sigmoid(X):
     return 1/(1+torch.exp(-X.squeeze()))
 
 def get_experiment_version(config):
-    versions = glob.glob(f'{config.exp_dir}/{config.exp_name}/verions_*')
+    versions = glob.glob(f'{os.getcwd()}/{config.exp_dir}/{config.exp_name}/version_*')
+    logging.info(f"Experiment Version: {len(versions)}")
     return len(versions)
 
 class MultilabelAP(Metric):
