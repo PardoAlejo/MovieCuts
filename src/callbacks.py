@@ -154,7 +154,7 @@ class wandb_config(Callback):
             cfg_path = os.path.join(config.log_dir, "config.json")
             with open(cfg_path, 'w') as f:
                 json.dump(vars(opt), f, indent=2)
-                json.dump(vars(config), f, indent=2)
+                json.dump(config, f, indent=2)
                 os.system('cp %s %s' % (opt.cfg, config.log_dir))
             config.cfg_path = cfg_path
 

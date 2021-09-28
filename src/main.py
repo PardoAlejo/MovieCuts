@@ -9,7 +9,6 @@ from torch.utils.tensorboard import SummaryWriter
 def parse_option():
     parser = argparse.ArgumentParser('MovieCuts for cut recognition training')
     parser.add_argument('--cfg', type=str, required=True, help='config file')
-    # parser.add_argument("--local_rank", type=int, help='local rank is used for DistributedDataParallel')
     args, opts = parser.parse_known_args()
     config.load(args.cfg, recursive=True)
     config.update(opts)
@@ -49,7 +48,7 @@ def main(opt, config):
     # ---------- Callbacks --------------
     wandb_config_cb = wandb_config(opt, config)
     # -- LR Monitor --
-    lr_monitor = LearningRateMonitor(logging_interval='step')
+    lr_monitor = LearningRateMonitor()
 
     # -- Checkpointing --
     ModelCheckpointCB = ModelCheckpoint(
