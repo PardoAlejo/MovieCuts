@@ -48,7 +48,7 @@ def main(opt, config):
     # ---------- Callbacks --------------
     wandb_config_cb = wandb_config(opt, config)
     # -- LR Monitor --
-    lr_monitor = LearningRateMonitor()
+    lr_monitor = LearningRateMonitor(logging_interval='step')
 
     # -- Checkpointing --
     ModelCheckpointCB = ModelCheckpoint(

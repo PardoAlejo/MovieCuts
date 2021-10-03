@@ -403,7 +403,9 @@ class Model(pl.LightningModule):
                                     gamma=self.config.lr_scheduler.lr_gamma,
                                     warmup_iters=warmup_iters,
                                     warmup_factor=0.5),
-                    'name': 'lr'} 
+                    'name': 'lr',
+                    "interval": "epoch",
+                    "frequency": 1} 
 
         return [optimizer], [lr_scheduler]
 
