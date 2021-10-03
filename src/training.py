@@ -404,7 +404,7 @@ class Model(pl.LightningModule):
                                     warmup_iters=warmup_iters,
                                     warmup_factor=0.5),
                     'name': 'lr',
-                    "interval": "epoch",
+                    "interval": "step",
                     "frequency": 1} 
 
         return [optimizer], [lr_scheduler]
