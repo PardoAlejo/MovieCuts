@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name MCe2e
 #SBATCH --array=0
-#SBATCH --time=16:00:00
+#SBATCH --time=12:00:00
 #SBATCH --gres=gpu:1
 #SBATCH -o .logs/%A_%a.out
 #SBATCH -e .logs/%A_%a.err
@@ -22,9 +22,9 @@ BATCH_SIZE=112
 NUM_WORKERS=6
 SNIPPET_SIZE=16
 #LR=0.1
-ABETA=0.28
-VBETA=0.43
-AVBETA=0.30
+ABETA=0
+VBETA=1
+AVBETA=0
 scale_h=128 # Scale H to read
 scale_w=180 # Scale W to read
 crop_size=112 # crop size to input the network
@@ -42,5 +42,4 @@ python src/main.py --cfg cfgs/ResNet18/default.yml \
     --model.abeta $ABETA \
     --model.avbeta $AVBETA\
     --base_exp_dir experiments\
-    --inference.multi_modal_inference True\
-    --inference.inverted_weights $INV
+    --model.audio_stream False

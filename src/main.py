@@ -130,7 +130,8 @@ if __name__ == "__main__":
                 f'_vbeta-{config.model.vbeta}',
                 f'_avbeta-{config.model.avbeta}',
                 f'_bs-{config.batch_size}'
-                ]
+                f'_mminf-{config.inference.multi_modal_inference}'
+                f'_invw-{config.inference.inverted_weights}']
     # -- Logger and Directories--
     generate_exp_directory(config)
     generate_exp_name(config, tags)

@@ -330,7 +330,27 @@ class Model(pl.LightningModule):
 
         labels_metric = labels/(labels.max(dim=1)[0].unsqueeze(-1))
 
-        self.ap_per_class_val.update(sigmoid(logits), labels_metric)
+        if self.config.inference.multi_modal_inference:
+            sigmoid_a = sigmoid(out_audio)
+            sigmoid_v = sigmoid(out_video)
+            sigmoid_av = sigmoid(logits)
+            
+            if self.config.inference.inverted_weights:
+
+                total_logits = (1-self.beta_audio)*sigmoid_a\
+                           +(1-self.beta_visual)*sigmoid_v\
+                           +(1-self.beta_audio_visual)*sigmoid_av
+            
+            else:
+                total_logits = (self.beta_audio)*sigmoid_a\
+                           +(self.beta_visual)*sigmoid_v\
+                           +(self.beta_audio_visual)*sigmoid_av
+
+            self.ap_per_class_val.update(total_logits, labels_metric)
+        
+        else:
+            
+            self.ap_per_class_val.update(sigmoid(logits), labels_metric)
         
         self.log('Validation_mAP',
                  self.ap_per_class_val.compute()[0],

@@ -29,6 +29,7 @@ model:
     abeta: 0.6
     avbeta: 0.18
     vbeta: 0.22
+    
 # ---------------------------------------------------------------------------- #
 # Inference options
 # ---------------------------------------------------------------------------- #
@@ -39,14 +40,15 @@ inference:
   test: True
   checkpoint: ''
   sanity_check_steps: 0
-
+  multi_modal_inference: False
+  inverted_weights: False
 # ---------------------------------------------------------------------------- #
 # Training options
 # ---------------------------------------------------------------------------- #
 
 training:
   num_workers: 16
-  max_epochs: 20
+  max_epochs: 10
   initialization: supervised #['scratch', 'supervised']
   print_freq: 1
   val_freq: 1
@@ -74,9 +76,10 @@ lr_scheduler:
   lr_decay: 0.9
   initial_lr: 0.01  # for 1 GPU and batch size 8. have to manually change when increase the number of GPUs or Batch size.
   warmup_epochs: 1
-  lr_gamma: 0.5
+  lr_gamma: 0.01
   lr_milestones:
-  - 7
+  - 4
+  - 8
 
 # ---------------------------------------------------------------------------- #
 # logging
