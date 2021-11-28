@@ -89,7 +89,7 @@ class WriteMetricReport(Callback):
         cut_types = pl_module.cut_types
         headers = ['Metric','Mean']+cut_types
         metrics_df = pd.DataFrame([aps], columns=headers)
-        save_dir = f'{trainer.log_dir}/class_metrics'
+        save_dir = f'{trainer.log_dir}/{trainer.logger.name}/class_metrics'
         if not os.path.exists(f'{save_dir}'):
             os.makedirs(save_dir, exist_ok=True)
         metrics_df.to_csv(f'{save_dir}/metrics-epoch_{trainer.current_epoch}.csv')
