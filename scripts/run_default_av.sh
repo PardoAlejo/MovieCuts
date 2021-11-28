@@ -18,8 +18,8 @@ DIR=/ibex/ai/home/pardogl/LTC-e2e
 cd $DIR
 echo `pwd`
 
-BATCH_SIZE=224
-NUM_WORKERS=12
+BATCH_SIZE=112
+NUM_WORKERS=6
 SNIPPET_SIZE=16
 LR=0.03
 ABETA=1.31
@@ -29,11 +29,6 @@ scale_h=128 # Scale H to read
 scale_w=180 # Scale W to read
 crop_size=112 # crop size to input the network
 INF=0
-# EXP_DIR=experiments
-# CKPT=supervised_audio_True_visual_True/default__snipsize-16_cropsize-112_winsamp-fixed_lr-0.03_abeta-1.31_vbeta-4.95_avbeta-2.74_bs-112_inference-0/version_0/checkpoints/epoch=7_Validation_loss=1.91.ckpt
-EXP_DIR=experiments_window_sampling
-CKPT=supervised_audio_True_visual_True/default__snipsize-16_cropsize-112_winsamp-fixed_lr-0.03_abeta-3_vbeta-3_avbeta-3_bs-112_inference-0/version_0/checkpoints/epoch=5_Validation_loss=1.96.ckpt
-
 
 python src/main.py --cfg cfgs/ResNet18/default.yml \
     --data.videos_path /ibex/ai/project/c2114/data/movies/framed_clips\
@@ -47,11 +42,7 @@ python src/main.py --cfg cfgs/ResNet18/default.yml \
     --model.vbeta $VBETA \
     --model.abeta $ABETA \
     --model.avbeta $AVBETA\
-    --base_exp_dir ${EXP_DIR}\
+    --base_exp_dir final_experiments \
     --inference.multi_modal_inference $INF \
-    --data.window_sampling fixed \
-    --inference.checkpoint ${EXP_DIR}/${CKPT} \
-    --mode.train False \
-    --mode.inference True \
-    --inference.validation True \
-    --inference.test False 
+    --data.window_sampling gaussian \
+    --wandb.use_wandb True
