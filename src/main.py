@@ -107,30 +107,18 @@ if __name__ == "__main__":
     opt, config = parse_option()
 
     # Generate experiment names and directories.
-    if 'dbloss' in config.file:
-        tags = [f'{osp.splitext(osp.basename(opt.cfg))[0]}_',
-                f'_winsamp-{config.data.window_sampling}',
-                f'_abeta-{config.model.abeta}',
-                f'_vbeta-{config.model.vbeta}',
-                f'_avbeta-{config.model.avbeta}',
-                f'_lr-{config.lr_scheduler.initial_lr}',
-                f'_CBbeta-{config.dbloss.CB.beta}',
-                f'_logit_init_bias-{config.dbloss.logit_reg.init_bias}',
-                f'_logit_neg_scale-{config.dbloss.logit_reg.neg_scale}'
-                ]
-    else:
-        tags = [f'{osp.splitext(osp.basename(opt.cfg))[0]}_',
-                f'_snipsize-{config.data.snippet_size}',
-                f'_cropsize-{config.data.crop_size}',
-                f'_winsamp-{config.data.window_sampling}',
-                f'_lr-{config.lr_scheduler.initial_lr}',
-                f'_abeta-{config.model.abeta}',
-                f'_vbeta-{config.model.vbeta}',
-                f'_avbeta-{config.model.avbeta}',
-                f'_bs-{config.batch_size}',
-                f'_inference-{config.inference.multi_modal_inference}',
-                f'validation_set-{config.inference.validation}',
-                f'test_set-{config.inference.test}']
+    tags = [f'{osp.splitext(osp.basename(opt.cfg))[0]}_',
+            f'_snipsize-{config.data.snippet_size}',
+            f'_cropsize-{config.data.crop_size}',
+            f'_winsamp-{config.data.window_sampling}',
+            f'_lr-{config.lr_scheduler.initial_lr}',
+            f'_abeta-{config.model.abeta}',
+            f'_vbeta-{config.model.vbeta}',
+            f'_avbeta-{config.model.avbeta}',
+            f'_bs-{config.batch_size}',
+            f'_inference-{config.inference.multi_modal_inference}',
+            f'validation_set-{config.inference.validation}',
+            f'test_set-{config.inference.test}']
     # -- Logger and Directories--
     generate_exp_directory(config)
     generate_exp_name(config, tags)

@@ -101,6 +101,7 @@ class CutTypeDataset(Dataset):
             self.cache_filename = f'{self.cache_path}/candidates_{self.mode}_distribution_{self.distribution}_cut_type_percent_{int(data_percent*100)}.json'
         else:
             self.cache_filename = f'{self.cache_path}/candidates_{self.mode}_distribution_{self.distribution}_cut_type_percent_{int(1*100)}.json'
+        
         if not os.path.exists(self.cache_filename):
             self.set_candidates()
         else:

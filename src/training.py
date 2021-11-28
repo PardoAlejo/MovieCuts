@@ -10,7 +10,6 @@ sys.path.insert(1, f'{os.getcwd()}/models')
 from video_resnet import r2plus1d_18
 from audio_model import AVENet
 from audio_visual_model import AudioVisualModel
-from DB_loss import ResampleLoss
 from callbacks import *
 from cut_type_dataset import CutTypeDataset
 from torch.utils.data import DataLoader
@@ -176,28 +175,7 @@ class Model(pl.LightningModule):
         self.inference_logits_epoch = []
         self.clip_names_epoch = []
 
-        if 'dbloss' in config.file:
-            dbloss = config.dbloss
-            focal = dict(focal=dbloss.focal.use_focal, balance_param=dbloss.focal.balance, gamma=dbloss.focal.gamma)
-            CB_loss = dict(CB_beta=dbloss.CB.beta, CB_mode=dbloss.CB.mode)
-            map_param = dict(alpha=dbloss.map.alpha, beta=dbloss.map.beta, gamma=dbloss.map.gamma)
-            logit_reg = dict(neg_scale=dbloss.logit_reg.neg_scale, init_bias=dbloss.logit_reg.init_bias)
-            self.db_loss = ResampleLoss(use_sigmoid=dbloss.sigmoid, 
-                                    reduction=dbloss.reduction,
-                                    loss_weight=dbloss.loss_weight,
-                                    partial=dbloss.partial_ce,
-                                    focal=focal,
-                                    CB_loss=CB_loss,
-                                    map_param=map_param,
-                                    logit_reg=logit_reg,
-                                    reweight_func=dbloss.reweight_func,
-                                    weight_norm=dbloss.weight_norm,
-                                    labels_file=dbloss.labels_file,
-                                    device=self.device)
-            self.model_loss = self.db_loss
-
-        else:
-            self.model_loss = self.bce_loss
+        self.model_loss = self.bce_loss
 
     def forward(self, x):
         if self.visual_stream and not self.audio_stream:
