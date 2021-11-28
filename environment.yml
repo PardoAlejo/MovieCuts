@@ -1,4 +1,4 @@
-name: torch1.3
+name: torch1.8
 channels:
   - pytorch-lts
   - nvidia
