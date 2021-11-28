@@ -13,3 +13,6 @@ data/framed_clips
 examples*
 *.json
 *.txt
+*experiments*
+.logs*
+dcgm/

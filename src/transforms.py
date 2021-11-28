@@ -99,7 +99,7 @@ def to_tensor(clip):
         raise TypeError(
             "clip tensor should have data type uint8. Got %s" % str(clip.dtype)
         )
-    return clip.float().permute(3, 0, 1, 2) / 255.0
+    return clip.float() / 255.0
 
 
 def normalize(clip, mean, std, inplace=False):
