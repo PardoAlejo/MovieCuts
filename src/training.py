@@ -404,13 +404,6 @@ class Model(pl.LightningModule):
             labels.type_as(logits))
         return ce
 
-    def focal_loss(self, logits, labels):
-        p = sigmoid(logits)
-        ce_loss = F.binary_cross_entropy_with_logits(logits, labels.type_as(logits), reduction="none")
-        p_t = p * labels + (1 - p) * (1 - labels)
-        loss = ce_loss * ((1 - p_t) ** self.config.focal_loss.gamma)
-        return loss.mean()
-
     def train_dataloader(self):
         return self._train_dataloader
 
