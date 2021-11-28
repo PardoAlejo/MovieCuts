@@ -12,5 +12,5 @@ expid: null
 seed: 4165
 wandb:
   use_wandb: True
-  project: moviecuts  # name of the wandb project
+  project: moviecuts-paper-results  # name of the wandb project
   entity: pardoalejo

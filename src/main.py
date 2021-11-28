@@ -34,7 +34,7 @@ def generate_exp_name(config, tags, name=None, logname=None):
     """
 
     if logname is None:
-        logname = ''.join(tags)
+        logname = ''.join(tags[:-2])
         if name:
             logname = '-'.join([name])
     config.exp_name = logname
@@ -81,7 +81,12 @@ def main(opt, config):
         trainer.fit(model)
 
     elif config.mode.inference:
-
+        path_comps = os.path.normpath(config.inference.checkpoint).split(os.sep)
+        exp_dir = '/'.join(path_comps[:-4])
+        exp_name = path_comps[-4]
+        version_num = path_comps[-3]
+        print(f'Running inference on model {exp_name} version {version_num} epoch {path_comps[-1]}')
+        logger = pl_loggers.TensorBoardLogger(save_dir=exp_dir, name=exp_name, version=version_num)
         tester = pl.Trainer(gpus=-1,
                         accelerator='ddp',
                         progress_bar_refresh_rate=config.inference.print_freq,
@@ -104,21 +109,14 @@ if __name__ == "__main__":
     # Generate experiment names and directories.
     if 'dbloss' in config.file:
         tags = [f'{osp.splitext(osp.basename(opt.cfg))[0]}_',
-                f'_snipsize-{config.data.snippet_size}',
-                f'_cropsize-{config.data.crop_size}',
                 f'_winsamp-{config.data.window_sampling}',
                 f'_abeta-{config.model.abeta}',
                 f'_vbeta-{config.model.vbeta}',
                 f'_avbeta-{config.model.avbeta}',
                 f'_lr-{config.lr_scheduler.initial_lr}',
-                f'_CBbeta-{config.dbloss.CB_beta}',
-                f'_CBmode-{config.dbloss.CB_mode}',
-                f'_alpha-{config.dbloss.map_alpha}',
-                f'_beta-{config.dbloss.map_beta}',
-                f'_gamma-{config.dbloss.map_alpha}',
-                f'_negscale-{config.dbloss.logit_neg_scale}',
-                f'_initbias-{config.dbloss.logit_init_bias}',
-                f'_bs-{config.batch_size}'
+                f'_CBbeta-{config.dbloss.CB.beta}',
+                f'_logit_init_bias-{config.dbloss.logit_reg.init_bias}',
+                f'_logit_neg_scale-{config.dbloss.logit_reg.neg_scale}'
                 ]
     else:
         tags = [f'{osp.splitext(osp.basename(opt.cfg))[0]}_',
@@ -129,9 +127,10 @@ if __name__ == "__main__":
                 f'_abeta-{config.model.abeta}',
                 f'_vbeta-{config.model.vbeta}',
                 f'_avbeta-{config.model.avbeta}',
-                f'_bs-{config.batch_size}'
-                f'_mminf-{config.inference.multi_modal_inference}'
-                f'_invw-{config.inference.inverted_weights}']
+                f'_bs-{config.batch_size}',
+                f'_inference-{config.inference.multi_modal_inference}',
+                f'validation_set-{config.inference.validation}',
+                f'test_set-{config.inference.test}']
     # -- Logger and Directories--
     generate_exp_directory(config)
     generate_exp_name(config, tags)

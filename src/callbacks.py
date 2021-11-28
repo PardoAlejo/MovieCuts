@@ -81,7 +81,8 @@ class WriteMetricReport(Callback):
     
     def on_validation_epoch_end(self, trainer, pl_module):
         mAP, ap_per_class = pl_module.ap_per_class_val.compute()
-
+        # print(f'AP per class len of targets : {len(pl_module.ap_per_class_val.target[0])}')
+        # print(f'AP per class len of logits : {len(pl_module.ap_per_class_val.preds[-1])}')
         #Prepare data to save it
         aps = ap_per_class; aps.insert(0,mAP)
         aps.insert(0,'AP')
@@ -96,7 +97,8 @@ class WriteMetricReport(Callback):
     def on_test_epoch_end(self, trainer, pl_module):
 
         mAP, ap_per_class = pl_module.ap_per_class_test.compute()
-
+        # print(f'AP per class len of targets : {len(pl_module.ap_per_class_test.target[0])}')
+        # print(f'AP per class len of logits : {len(pl_module.ap_per_class_test.preds[-1])}')
         #Prepare data to save it
         aps = ap_per_class; aps.insert(0,mAP)
         aps.insert(0,'AP')
@@ -105,8 +107,8 @@ class WriteMetricReport(Callback):
         metrics_df = pd.DataFrame([aps], columns=headers)
         print(headers)
         print(aps)
-        if pl_module.args.finetune_test:
-            save_dir = f'{trainer.log_dir}/{trainer.logger.name}/class_metrics_test'
+        if pl_module.config.inference.test:
+            save_dir = f'{trainer.log_dir}/class_metrics_test'
             if not os.path.exists(f'{save_dir}'):
                 os.makedirs(save_dir, exist_ok=True)
             metrics_df.to_csv(f'{save_dir}/metrics-epoch_{trainer.current_epoch}.csv')
@@ -117,8 +119,10 @@ class SaveLogits(Callback):
     def __init__(self):
         super().__init__()
     
-    def on_test_end(self, trainer, pl_module):
-        split = 'test' if pl_module.args.finetune_test else 'val'
+    def on_test_epoch_end(self, trainer, pl_module):
+        split = 'test' if pl_module.config.inference.test else 'val'
+        # print(f'Len of inf logits {len(pl_module.inference_logits_epoch[0])}')
+        # print(f'Len of inf logits {len(pl_module.inference_logits_epoch[-1])}')
         all_logits = torch.cat(pl_module.inference_logits_epoch).detach().cpu().numpy()
         clip_names = [name for batch in pl_module.clip_names_epoch for name in batch]
         logits = dict(zip(clip_names, all_logits))

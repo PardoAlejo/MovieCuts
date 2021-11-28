@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name MCe2e
+#SBATCH --job-name MCe2eAV
 #SBATCH --array=0
 #SBATCH --time=16:00:00
 #SBATCH --gres=gpu:1
@@ -12,7 +12,7 @@
 echo `hostname`
 module load cuda/11.1.1
 module load gcc/6.4.0
-source activate torch1.3
+# source activate torch1.3
 
 DIR=/ibex/ai/home/pardogl/LTC-e2e
 cd $DIR
@@ -21,13 +21,14 @@ echo `pwd`
 BATCH_SIZE=112
 NUM_WORKERS=6
 SNIPPET_SIZE=16
-#LR=0.1
-ABETA=0.28
-VBETA=0.43
-AVBETA=0.30
+LR=0.03
+ABETA=1.31
+VBETA=4.95
+AVBETA=2.74
 scale_h=128 # Scale H to read
 scale_w=180 # Scale W to read
 crop_size=112 # crop size to input the network
+INF=0
 
 python src/main.py --cfg cfgs/ResNet18/default.yml \
     --data.videos_path /ibex/ai/project/c2114/data/movies/framed_clips\
@@ -41,6 +42,7 @@ python src/main.py --cfg cfgs/ResNet18/default.yml \
     --model.vbeta $VBETA \
     --model.abeta $ABETA \
     --model.avbeta $AVBETA\
-    --base_exp_dir experiments\
-    --inference.multi_modal_inference True\
-    --inference.inverted_weights $INV
+    --base_exp_dir final_experiments \
+    --inference.multi_modal_inference $INF \
+    --data.window_sampling gaussian \
+    --wandb.use_wandb True

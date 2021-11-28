@@ -96,7 +96,7 @@ class Config(dict):
                 seperator = '\n'
             else:
                 seperator = ' '
-            text = key + ':' + seperator + str(value)
+            text = f'{key} : {seperator} {value}'
             lines = text.split('\n')
             for k, line in enumerate(lines[1:]):
                 lines[k + 1] = (' ' * 2) + line

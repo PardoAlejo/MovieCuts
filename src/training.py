@@ -24,6 +24,7 @@ from torchvision.io import write_video
 import json
 from callbacks import MultilabelAP
 import logging 
+logging.basicConfig(level=logging.DEBUG)
 
 def sigmoid(X):
     return 1/(1+torch.exp(-X.squeeze()))
@@ -176,18 +177,22 @@ class Model(pl.LightningModule):
         self.clip_names_epoch = []
 
         if 'dbloss' in config.file:
-            dbloss_args = config.dbloss
-            focal = dict(focal=dbloss_args.focal_on, balance_param=dbloss_args.focal_balance, gamma=dbloss_args.focal_gamma)
-            CB_loss = dict(CB_beta=dbloss_args.CB_beta, CB_mode=dbloss_args.CB_mode)
-            map_param = dict(alpha=dbloss_args.map_alpha, beta=dbloss_args.map_beta, gamma=dbloss_args.map_gamma)
-            logit_reg = dict(neg_scale=dbloss_args.logit_neg_scale, init_bias=dbloss_args.logit_init_bias)
-            self.db_loss = ResampleLoss(use_sigmoid=True, 
-                                    reduction='mean', 
-                                    reweight_func='rebalance',
+            dbloss = config.dbloss
+            focal = dict(focal=dbloss.focal.use_focal, balance_param=dbloss.focal.balance, gamma=dbloss.focal.gamma)
+            CB_loss = dict(CB_beta=dbloss.CB.beta, CB_mode=dbloss.CB.mode)
+            map_param = dict(alpha=dbloss.map.alpha, beta=dbloss.map.beta, gamma=dbloss.map.gamma)
+            logit_reg = dict(neg_scale=dbloss.logit_reg.neg_scale, init_bias=dbloss.logit_reg.init_bias)
+            self.db_loss = ResampleLoss(use_sigmoid=dbloss.sigmoid, 
+                                    reduction=dbloss.reduction,
+                                    loss_weight=dbloss.loss_weight,
+                                    partial=dbloss.partial_ce,
                                     focal=focal,
                                     CB_loss=CB_loss,
                                     map_param=map_param,
                                     logit_reg=logit_reg,
+                                    reweight_func=dbloss.reweight_func,
+                                    weight_norm=dbloss.weight_norm,
+                                    labels_file=dbloss.labels_file,
                                     device=self.device)
             self.model_loss = self.db_loss
 
@@ -335,16 +340,18 @@ class Model(pl.LightningModule):
             sigmoid_v = sigmoid(out_video)
             sigmoid_av = sigmoid(logits)
             
-            if self.config.inference.inverted_weights:
-
-                total_logits = (1-self.beta_audio)*sigmoid_a\
-                           +(1-self.beta_visual)*sigmoid_v\
-                           +(1-self.beta_audio_visual)*sigmoid_av
-            
-            else:
+            if self.config.inference.multi_modal_inference == 1:
+                total_logits = (1)*sigmoid_a\
+                           +(1)*sigmoid_v\
+                           +(1)*sigmoid_av
+            elif self.config.inference.multi_modal_inference == 2:
                 total_logits = (self.beta_audio)*sigmoid_a\
                            +(self.beta_visual)*sigmoid_v\
                            +(self.beta_audio_visual)*sigmoid_av
+            elif self.config.inference.multi_modal_inference == 3:
+                total_logits = (1-self.beta_audio)*sigmoid_a\
+                           +(1-self.beta_visual)*sigmoid_v\
+                           +(1-self.beta_audio_visual)*sigmoid_av
 
             self.ap_per_class_val.update(total_logits, labels_metric)
         
@@ -456,6 +463,8 @@ class Model(pl.LightningModule):
 
     def test_dataloader(self):
         if self.config.inference.test:
+            logging.info(f'Doing inference on test  with {len(self._test_dataloader)} samples')
             return self._test_dataloader
         elif self.config.inference.validation:
+            logging.info(f'Doing inference on val  with {len(self._val_dataloader)} samples')
             return self._val_dataloader

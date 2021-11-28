@@ -14,7 +14,7 @@ data:
   crop_size: 112 # crop size to input the network
   snippet_size: 16 # number of frames per clip
   num_classes: 10
-  window_sampling: gaussian # choose between ['gaussian', 'uniform', 'fixed']
+  window_sampling: fixed # choose between ['gaussian', 'uniform', 'fixed']
   distribution: natural # choose between ['natural', 'uniform', 'sqrt']
   data_percent: 1 # *100 percetange of data to train with
 
@@ -36,12 +36,13 @@ model:
 
 inference:
   print_freq: 1
-  validation: False 
-  test: True
+  validation: True 
+  test: False
   checkpoint: ''
   sanity_check_steps: 0
-  multi_modal_inference: False
-  inverted_weights: False
+  multi_modal_inference: 0 # '0' not, '1' all modalities same, 
+                           # '2' weighted avg (same as model), 
+                           # '3' inverted weigted average 
 # ---------------------------------------------------------------------------- #
 # Training options
 # ---------------------------------------------------------------------------- #
@@ -87,5 +88,5 @@ lr_scheduler:
 log_dir: './log/dbloss'
 base_exp_dir: './experiments'
 wandb:
-  project: moviecuts  # name of the wandb project
+  project: moviecuts-paper-results  # name of the wandb project
   entity: pardoalejo  # *will automatically merge with the parent yaml*

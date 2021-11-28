@@ -53,7 +53,7 @@ class ResampleLoss(nn.Module):
         self.device = device
         self.use_sigmoid = use_sigmoid
         self.partial = partial
-        self.loss_weight = loss_weight
+        self.loss_weight = torch.tensor(loss_weight)
         self.reduction = reduction
         if self.use_sigmoid:
             if self.partial:
@@ -71,16 +71,16 @@ class ResampleLoss(nn.Module):
 
         # focal loss params
         self.focal = focal['focal']
-        self.gamma = focal['gamma']
-        self.balance_param = focal['balance_param']
+        self.gamma = torch.tensor(focal['gamma'])
+        self.balance_param = torch.tensor(focal['balance_param'])
 
         # mapping function params
-        self.map_alpha = map_param['alpha']
-        self.map_beta = map_param['beta']
-        self.map_gamma = map_param['gamma']
+        self.map_alpha = torch.tensor(map_param['alpha'])
+        self.map_beta = torch.tensor(map_param['beta'])
+        self.map_gamma = torch.tensor(map_param['gamma'])
 
         # CB loss params (optional)
-        self.CB_beta = CB_loss['CB_beta']
+        self.CB_beta = torch.tensor(CB_loss['CB_beta'])
         self.CB_mode = CB_loss['CB_mode']
 
         self.train_json = json.load(open(labels_file))
@@ -176,6 +176,9 @@ class ResampleLoss(nn.Module):
 
     def rebalance_weight(self, gt_labels):
         self.freq_inv = self.freq_inv.type_as(gt_labels)
+        self.map_alpha = self.map_alpha.type_as(gt_labels)
+        self.map_beta = self.map_beta.type_as(gt_labels)
+        self.map_gamma = self.map_gamma.type_as(gt_labels)
         repeat_rate = (gt_labels.float() * self.freq_inv).sum(dim=1, keepdim=True)
         pos_weight = self.freq_inv.clone().detach().unsqueeze(0) / repeat_rate
         # pos and neg are equally treated
@@ -184,7 +187,9 @@ class ResampleLoss(nn.Module):
         return weight
 
     def CB_weight(self, gt_labels):
-
+        
+        self.CB_beta = self.CB_beta.type_as(gt_labels)
+        self.class_freq = self.class_freq.type_as(gt_labels)
         if  'by_class' in self.CB_mode:
             weight = ((1 - self.CB_beta)) / \
                      (1 - torch.pow(self.CB_beta, self.class_freq))
@@ -209,6 +214,7 @@ class ResampleLoss(nn.Module):
         return weight
 
     def RW_weight(self, gt_labels, by_class=True):
+        self.propotion_inv = self.propotion_inv.type_as(gt_labels)
         if 'sqrt' in self.reweight_func:
             weight = torch.sqrt(self.propotion_inv)
         else:

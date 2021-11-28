@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name MCe2e
+#SBATCH --job-name MCe2eA
 #SBATCH --array=0
 #SBATCH --time=12:00:00
 #SBATCH --gres=gpu:1
@@ -21,7 +21,7 @@ echo `pwd`
 BATCH_SIZE=112
 NUM_WORKERS=6
 SNIPPET_SIZE=16
-#LR=0.1
+LR=0.2
 ABETA=1
 VBETA=0
 AVBETA=0
