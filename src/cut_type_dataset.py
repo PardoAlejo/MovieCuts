@@ -8,10 +8,11 @@ import ffmpeg
 from PIL import Image
 from scipy import signal
 from tqdm import tqdm
-from torchvision.io import read_video, write_video
+from torchvision.io import read_video, write_video, read_image
 import soundfile as sf
 import json
 import matplotlib.pyplot as plt
+import logging
 
 class CutTypeDataset(Dataset):
     """Construct an untrimmed video classification dataset.
@@ -25,7 +26,7 @@ class CutTypeDataset(Dataset):
                  visual_stream=True,
                  audio_stream=True,
                  transform=None,
-                 videos_path = 'data/framed_clips',
+                 videos_path = '/ibex/ai/project/c2114/data/movies/framed_clips',
                  cache_path = './.cache',
                  augment_temporal_shift=True,
                  pos_delta_range=list(range(5)),
@@ -49,7 +50,9 @@ class CutTypeDataset(Dataset):
         self.shots_df_by_movie_id = self.shots_df.groupby('movie_id')
         self.videos_path = videos_path
         self.cache_path = cache_path
-        
+        if not os.path.exists(self.cache_path):
+            os.makedirs(self.cache_path)
+
         self.data_percent = data_percent
 
         self.transform = transform
@@ -98,13 +101,14 @@ class CutTypeDataset(Dataset):
             self.cache_filename = f'{self.cache_path}/candidates_{self.mode}_distribution_{self.distribution}_cut_type_percent_{int(data_percent*100)}.json'
         else:
             self.cache_filename = f'{self.cache_path}/candidates_{self.mode}_distribution_{self.distribution}_cut_type_percent_{int(1*100)}.json'
+        
         if not os.path.exists(self.cache_filename):
             self.set_candidates()
         else:
-            print(f'Cache file found at: {self.cache_filename}')
+            logging.info(f'Cache file found at: {self.cache_filename}')
             self.read_cache_candidates()
 
-
+        logging.info(f"Number of candidates for {self.mode}: {len(self.candidates)}")
         self.num_per_class_pos_sampling = {x:0 for x in self.cut_types}
         self.get_number_per_class_pos_sampling()
 
@@ -160,15 +164,10 @@ class CutTypeDataset(Dataset):
         frames = []
 
         for f in filenames:
-            img = Image.open(f)
-            img = img.convert('RGB')
+            img = read_image(f)
             frames.append(img)
-            
-        if (self.augment_spatial_flip) & (bool(random.getrandbits(1))):
-            frames = [img.transpose(Image.FLIP_LEFT_RIGHT) for img in frames]
 
-        frames = [torch.from_numpy(np.asarray(img).copy()) for img in frames]
-        frames = torch.stack(frames, 0)
+        frames = torch.stack(frames, 1)
 
         return frames
     
@@ -189,7 +188,7 @@ class CutTypeDataset(Dataset):
     def generate_fix_window_sampling(self, cut_frame_id, window):
         low = cut_frame_id - int(window/2)
         high = cut_frame_id + int(window/2)
-        ids = list(np.linspace(low, self.snippet_size, high).astype(np.uint8))
+        ids = list(np.linspace(low, high, self.snippet_size).astype(np.uint8))
         return ids
 
     def __getitem__(self, idx):
@@ -264,10 +263,10 @@ class CutTypeDataset(Dataset):
 
     def read_cache_candidates(self):
         self.candidates = json.load(open(self.cache_filename))
-        print('Candidates read from cache file')
+        logging.info('Candidates read from cache file')
 
     def set_candidates(self):
-        print(f'Setting candidates for {self.mode}')
+        logging.info(f'Setting candidates for {self.mode}')
         self.candidates = {}
         not_labeled_clips = []
         for clip_name in tqdm(self.clip_names):
@@ -290,7 +289,7 @@ class CutTypeDataset(Dataset):
             else:
                 self.candidates[clip_name] = {'shot_times':shot_times, 'labels':this_labels}
 
-        print(f'Saving cache candidates file in: {self.cache_filename}')
+        logging.info(f'Saving cache candidates file in: {self.cache_filename}')
         with open(self.cache_filename, 'w') as f:
             json.dump(self.candidates, f)
 
