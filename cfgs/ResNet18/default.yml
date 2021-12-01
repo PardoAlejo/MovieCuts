@@ -40,7 +40,8 @@ inference:
   test: False
   checkpoint: ''
   sanity_check_steps: 0
-
+  multi_modal_inference: 0
+  save_path: 
 # ---------------------------------------------------------------------------- #
 # Training options
 # ---------------------------------------------------------------------------- #
@@ -55,8 +56,8 @@ training:
   save_top_k: 2
 
   from_scratch: False
-  video_model_path: 'model_checkpoints/r2plus1d_18-91a641e6.pth'
-  audio_model_path: 'model_checkpoints/vggsound_avgpool.pth.tar'
+  video_model_path: 'checkpoints/r2plus1d_18-91a641e6.pth'
+  audio_model_path: 'checkpoints/vggsound_avgpool.pth.tar'
   
   sanity_check_steps: 0
 

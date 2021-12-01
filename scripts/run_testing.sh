@@ -20,39 +20,21 @@ echo `pwd`
 
 BATCH_SIZE=224
 NUM_WORKERS=12
-SNIPPET_SIZE=16
-LR=0.03
-ABETA=1.31
-VBETA=4.95
-AVBETA=2.74
-scale_h=128 # Scale H to read
-scale_w=180 # Scale W to read
-crop_size=112 # crop size to input the network
-INF=0
-# EXP_DIR=experiments
+
+# EXP_DIR=experiments_submission_cvpr22
 # CKPT=${EXP_DIR}/supervised_audio_True_visual_True/default__snipsize-16_cropsize-112_winsamp-fixed_lr-0.03_abeta-1.31_vbeta-4.95_avbeta-2.74_bs-112_inference-0/version_0/checkpoints/epoch=7_Validation_loss=1.91.ckpt
 # EXP_DIR=experiments_window_sampling
 # CKPT=supervised_audio_True_visual_True/default__snipsize-16_cropsize-112_winsamp-fixed_lr-0.03_abeta-3_vbeta-3_avbeta-3_bs-112_inference-0/version_0/checkpoints/epoch=5_Validation_loss=1.96.ckpt
 
-MODEL=model_checkpoints/epoch=7_Validation_loss=1.91.ckpt
-
+CKPT=checkpoints/epoch=7_Validation_loss=1.91.ckpt
+SAVE_PATH=OUTPUTS
 python src/main.py --cfg cfgs/ResNet18/default.yml \
     --data.videos_path /ibex/ai/project/c2114/data/movies/framed_clips\
-    --data.scale_h $scale_h\
-    --data.scale_w $scale_w\
-    --data.crop_size $crop_size\
     --training.num_workers $NUM_WORKERS \
     --batch_size $BATCH_SIZE \
-    --data.snippet_size $SNIPPET_SIZE\
-    --lr_scheduler.initial_lr $LR \
-    --model.vbeta $VBETA \
-    --model.abeta $ABETA \
-    --model.avbeta $AVBETA\
-    --base_exp_dir ${EXP_DIR}\
-    --inference.multi_modal_inference $INF \
-    --data.window_sampling fixed \
-    --inference.checkpoint ${MODEL} \
+    --inference.checkpoint ${CKPT} \
+    --inference.save_path ${SAVE_PATH} \
     --mode.train False \
     --mode.inference True \
-    --inference.validation True \
-    --inference.test False 
+    --inference.validation False \
+    --inference.test True 

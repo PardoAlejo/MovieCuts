@@ -38,7 +38,7 @@ gsutil -m cp \
   "gs://pardogl/moviecuts/model_checkpoints/epoch=7_Validation_loss=1.91.ckpt" \
   "gs://pardogl/moviecuts/model_checkpoints/r2plus1d_18-91a641e6.pth" \
   "gs://pardogl/moviecuts/model_checkpoints/vggsound_avgpool.pth.tar" \
-  model_checkpoints
+  checkpoints
 ```
 
 The folder structure should be as follows:
@@ -52,7 +52,7 @@ ltc-env.yml
 │   ├── cut-type-val.json
 │   └── zipped_frames.zip
 │
-├── model_checkpoints
+├── checkpoints
 |    ├── vggsound_avgpool.pth.tar
 |    ├── r2plus1d_18-91a641e6.pth
 │    └── epoch=7_Validation_loss=1.91.ckpt

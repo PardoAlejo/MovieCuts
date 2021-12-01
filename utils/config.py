@@ -59,6 +59,7 @@ class Config(dict):
         index = 0
         while index < len(opts):
             opt = opts[index]
+
             if opt.startswith('--'):
                 opt = opt[2:]
             if '=' in opt:

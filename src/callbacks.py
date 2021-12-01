@@ -70,7 +70,7 @@ class MultilabelAP(Metric):
             ap_per_class.append(this_ap)
             
         mAP = np.mean(ap_per_class)
-        return [mAP, ap_per_class, preds, target]
+        return [mAP, ap_per_class]
 
 
 class WriteMetricReport(Callback):
@@ -109,6 +109,11 @@ class WriteMetricReport(Callback):
         print(aps)
         if pl_module.config.inference.test:
             save_dir = f'{trainer.log_dir}/class_metrics_test'
+            if not os.path.exists(f'{save_dir}'):
+                os.makedirs(save_dir, exist_ok=True)
+            metrics_df.to_csv(f'{save_dir}/metrics-epoch_{trainer.current_epoch}.csv')
+        elif pl_module.config.inference.validation:
+            save_dir = f'{trainer.log_dir}/class_metrics_val'
             if not os.path.exists(f'{save_dir}'):
                 os.makedirs(save_dir, exist_ok=True)
             metrics_df.to_csv(f'{save_dir}/metrics-epoch_{trainer.current_epoch}.csv')
