@@ -111,7 +111,6 @@ class CutTypeDataset(Dataset):
         self.candidate_names = list(self.candidates.keys())
 
     def __len__(self):
-        return 300
         return min(len(self.candidate_names),len(self.clip_names))
 
     def get_average_shots_per_scene(self):
