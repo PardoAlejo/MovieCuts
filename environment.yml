@@ -1,4 +1,4 @@
-name: moviecuts2
+name: moviecuts
 channels:
   - anaconda
   - pytorch
@@ -170,4 +170,4 @@ dependencies:
     - yarl==1.7.2
     - yaspin==2.1.0
     - zipp==3.6.0
-prefix: /home/pardogl/anaconda3/envs/moviecuts2
+prefix: /home/pardogl/anaconda3/envs/moviecuts
