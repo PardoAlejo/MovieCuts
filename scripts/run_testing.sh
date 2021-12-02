@@ -10,16 +10,16 @@
 #SBATCH --mem 96GB
 
 echo `hostname`
-module load cuda/11.1.1
-module load gcc/6.4.0
-# source activate torch1.3
+# module load cuda/11.1.1
+# module load gcc/6.4.0
+# # source activate torch1.3
 
-DIR=/ibex/ai/home/pardogl/LTC-e2e
-cd $DIR
+# DIR=/ibex/ai/home/pardogl/LTC-e2e
+# cd $DIR
 echo `pwd`
 
-BATCH_SIZE=224
-NUM_WORKERS=12
+BATCH_SIZE=64
+NUM_WORKERS=48
 
 # EXP_DIR=experiments_submission_cvpr22
 # CKPT=${EXP_DIR}/supervised_audio_True_visual_True/default__snipsize-16_cropsize-112_winsamp-fixed_lr-0.03_abeta-1.31_vbeta-4.95_avbeta-2.74_bs-112_inference-0/version_0/checkpoints/epoch=7_Validation_loss=1.91.ckpt
@@ -28,8 +28,11 @@ NUM_WORKERS=12
 
 CKPT=checkpoints/epoch=7_Validation_loss=1.91.ckpt
 SAVE_PATH=OUTPUTS
+# DATA_PATH=/ibex/ai/project/c2114/data/movies/framed_clips
+DATA_PATH=data/framed_clips
+
 python src/main.py --cfg cfgs/ResNet18/default.yml \
-    --data.videos_path /ibex/ai/project/c2114/data/movies/framed_clips\
+    --data.videos_path ${DATA_PATH}\
     --training.num_workers $NUM_WORKERS \
     --batch_size $BATCH_SIZE \
     --inference.checkpoint ${CKPT} \

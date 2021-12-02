@@ -23,11 +23,11 @@ class CutTypeDataset(Dataset):
     def __init__(self,
                  shots_filenames,
                  cut_type_filename,
-                 visual_stream=True,
-                 audio_stream=True,
-                 transform=None,
-                 videos_path = '/ibex/ai/project/c2114/data/movies/framed_clips',
-                 cache_path = './.cache',
+                 visual_stream,
+                 audio_stream,
+                 transform,
+                 videos_path,
+                 cache_path,
                  augment_temporal_shift=True,
                  pos_delta_range=list(range(5)),
                  augment_spatial_flip=True,
@@ -109,8 +109,6 @@ class CutTypeDataset(Dataset):
             self.read_cache_candidates()
 
         logging.info(f"Number of candidates for {self.mode}: {len(self.candidates)}")
-        self.num_per_class_pos_sampling = {x:0 for x in self.cut_types}
-        self.get_number_per_class_pos_sampling()
 
         self.candidate_names = list(self.candidates.keys())
 
@@ -162,7 +160,7 @@ class CutTypeDataset(Dataset):
 
         filenames = [f'{clip_path}/frames/{i:06d}.jpg' for i in ids]
         frames = []
-
+        
         for f in filenames:
             img = read_image(f)
             frames.append(img)
@@ -237,29 +235,6 @@ class CutTypeDataset(Dataset):
             this_cut_types = [cut_type for cut_type, label in zip(self.cut_types, this_labels) if label==1]
             for cut_type in this_cut_types:
                 self.num_per_class[cut_type] += 1
-
-    def get_number_per_class_pos_sampling(self):
-        for clip_name, dic in self.candidates.items():
-            this_labels = dic['labels']
-            this_cut_types = [cut_type for cut_type, label in zip(self.cut_types, this_labels) if label==1]
-            for cut_type in this_cut_types:
-                self.num_per_class_pos_sampling[cut_type] += 1
-
-    def get_weights_uniform_distribution(self):
-        # max_represented_class = max(self.num_per_class.values())
-        # weight_per_class = {k:int(max_represented_class/v) for k,v in self.num_per_class.items()}
-        total_samples = sum(self.num_per_class.values())
-        t = 5e-1
-        weight_per_class = {k:int(t/(v/total_samples)) for k,v in self.num_per_class.items()}
-        return weight_per_class
-
-    def get_weights_sqrt_distribution(self):
-        # max_represented_class = max(self.num_per_class.values())
-        # weight_per_class = {k:int(np.sqrt(max_represented_class/v)) for k,v in self.num_per_class.items()}
-        total_samples = sum(self.num_per_class.values())
-        t = 10e-1
-        weight_per_class = {k:int(np.sqrt(t/(v/total_samples))) for k,v in self.num_per_class.items()}
-        return weight_per_class
 
     def read_cache_candidates(self):
         self.candidates = json.load(open(self.cache_filename))
