@@ -1,10 +1,10 @@
 from training import *
 import argparse
-import time, pathlib, logging, os.path as osp
+import logging, os.path as osp
 sys.path.insert(1, f'{os.getcwd()}/utils')
-from wandb_utils import Wandb
-from config import config, Config
-from torch.utils.tensorboard import SummaryWriter
+from pytorch_lightning import loggers as pl_loggers
+from pytorch_lightning.callbacks import LearningRateMonitor
+from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
 
 def parse_option():
     parser = argparse.ArgumentParser('MovieCuts for cut recognition training')

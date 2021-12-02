@@ -1,7 +1,5 @@
 import numpy as np
 import torch
-from torch.optim import Adam
-from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.nn import functional as F
 import torchvision
 import sys
@@ -13,14 +11,9 @@ from audio_visual_model import AudioVisualModel
 from callbacks import *
 from cut_type_dataset import CutTypeDataset
 from torch.utils.data import DataLoader
-from pytorch_lightning import loggers as pl_loggers
-from pytorch_lightning.callbacks import LearningRateMonitor
-from pytorch_lightning.callbacks.model_checkpoint import ModelCheckpoint
 import pytorch_lightning as pl
 import transforms as T
 from scheduler import WarmupMultiStepLR
-from torchvision.io import write_video
-import json
 from callbacks import MultilabelAP
 import logging 
 logging.basicConfig(level=logging.DEBUG)

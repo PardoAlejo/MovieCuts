@@ -4,8 +4,6 @@ import pandas as pd
 import os
 import numpy as np
 import random
-import ffmpeg
-from PIL import Image
 from scipy import signal
 from tqdm import tqdm
 from torchvision.io import read_video, write_video, read_image
@@ -113,6 +111,7 @@ class CutTypeDataset(Dataset):
         self.candidate_names = list(self.candidates.keys())
 
     def __len__(self):
+        return 300
         return min(len(self.candidate_names),len(self.clip_names))
 
     def get_average_shots_per_scene(self):

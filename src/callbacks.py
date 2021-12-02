@@ -13,7 +13,6 @@ from pytorch_lightning.metrics import Metric
 from pytorch_lightning import metrics
 import pandas as pd
 from sklearn.metrics import average_precision_score
-import wandb 
 
 def sigmoid(X):
     return 1/(1+torch.exp(-X.squeeze()))
