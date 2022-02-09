@@ -101,10 +101,8 @@ def main(opt, config):
         tester = pl.Trainer(gpus=-1,
                         accelerator='ddp',
                         progress_bar_refresh_rate=config.inference.print_freq,
-                        weights_summary='top',
                         logger=logger,
                         callbacks=[WriteMetricReport(), SaveLogits()],
-                        profiler="simple",
                         num_sanity_val_steps=config.inference.sanity_check_steps)
 
         path = config.inference.checkpoint

@@ -87,6 +87,9 @@ class WriteMetricReport(Callback):
         aps.insert(0,'AP')
         cut_types = pl_module.cut_types
         headers = ['Metric','Mean']+cut_types
+        print(f'This Model mAP: {aps[1]*100:.2f}%')
+        for cl, apcl in zip(headers[2:], aps[2:]):
+            print(f'AP for class {cl}: {apcl*100:.2f}%')
         metrics_df = pd.DataFrame([aps], columns=headers)
         save_dir = f'{trainer.log_dir}/{trainer.logger.name}/class_metrics'
         if not os.path.exists(f'{save_dir}'):
@@ -104,8 +107,9 @@ class WriteMetricReport(Callback):
         cut_types = pl_module.cut_types
         headers = ['Metric','Mean']+cut_types
         metrics_df = pd.DataFrame([aps], columns=headers)
-        print(headers)
-        print(aps)
+        print(f'This Model mAP: {aps[1]*100:.2f}%')
+        for cl, apcl in zip(headers[2:], aps[2:]):
+            print(f'AP for {cl}: {apcl*100:.2f}%')
         if pl_module.config.inference.test:
             save_dir = f'{trainer.log_dir}/class_metrics_test'
             if not os.path.exists(f'{save_dir}'):

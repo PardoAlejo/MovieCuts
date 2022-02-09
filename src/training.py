@@ -37,7 +37,6 @@ def get_transforms(config):
     transform_val = torchvision.transforms.Compose(
         [
             T.ToTensorVideo(),
-            T.RandomHorizontalFlipVideo(p=0.5),
             T.Resize((config.data.scale_h, config.data.scale_w)),
             T.NormalizeVideo(
                 mean=(0.43216, 0.394666, 0.37645), std=(0.22803, 0.22145, 0.216989)
