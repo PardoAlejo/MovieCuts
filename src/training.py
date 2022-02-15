@@ -121,7 +121,7 @@ class Model(pl.LightningModule):
         self.beta_audio_visual = config.model.avbeta
 
         self.batch_size = config.batch_size
-
+        
         self._train_dataloader, self._val_dataloader, self._test_dataloader = get_dataloader(config)
 
         self.cut_types = self._train_dataloader.dataset.cut_types
@@ -175,7 +175,7 @@ class Model(pl.LightningModule):
         elif not self.visual_stream and self.audio_stream:
             predictions = self.resnet18(x)
         elif self.visual_stream and self.audio_stream:
-            predictions = self.audio_visual_network(x)
+            predictions = self.audio_visual_network(x[0],x[1])
         return predictions
 
     def _load_weights_supervised(self):
