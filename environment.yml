@@ -1,7 +1,7 @@
 name: moviecuts
 channels:
-  - anaconda
   - pytorch
+  - anaconda
   - conda-forge
   - defaults
 dependencies:
@@ -124,6 +124,7 @@ dependencies:
     - aiosignal==1.2.0
     - async-timeout==4.0.1
     - attrs==21.2.0
+    - av==8.1.0
     - cachetools==4.2.4
     - charset-normalizer==2.0.8
     - click==8.0.3
@@ -170,4 +171,4 @@ dependencies:
     - yarl==1.7.2
     - yaspin==2.1.0
     - zipp==3.6.0
-prefix: /home/pardogl/anaconda3/envs/moviecuts
+prefix: /home/pardogl/miniconda3/envs/moviecuts
