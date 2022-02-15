@@ -94,7 +94,7 @@ class WriteMetricReport(Callback):
         save_dir = f'{trainer.log_dir}/{trainer.logger.name}/class_metrics'
         if not os.path.exists(f'{save_dir}'):
             os.makedirs(save_dir, exist_ok=True)
-        metrics_df.to_csv(f'{save_dir}/metrics-epoch_{trainer.current_epoch}.csv')
+        metrics_df.to_csv(f'{save_dir}/metrics-epoch_{trainer.current_epoch}.csv',index=False)
 
     def on_test_epoch_end(self, trainer, pl_module):
 
@@ -114,12 +114,12 @@ class WriteMetricReport(Callback):
             save_dir = f'{trainer.log_dir}/class_metrics_test'
             if not os.path.exists(f'{save_dir}'):
                 os.makedirs(save_dir, exist_ok=True)
-            metrics_df.to_csv(f'{save_dir}/metrics-epoch_{trainer.current_epoch}.csv')
+            metrics_df.to_csv(f'{save_dir}/metrics-epoch_{trainer.current_epoch}.csv',index=False)
         elif pl_module.config.inference.validation:
             save_dir = f'{trainer.log_dir}/class_metrics_val'
             if not os.path.exists(f'{save_dir}'):
                 os.makedirs(save_dir, exist_ok=True)
-            metrics_df.to_csv(f'{save_dir}/metrics-epoch_{trainer.current_epoch}.csv')
+            metrics_df.to_csv(f'{save_dir}/metrics-epoch_{trainer.current_epoch}.csv',index=False)
 
 class SaveLogits(Callback):
     """PyTorch Lightning metric callback."""
