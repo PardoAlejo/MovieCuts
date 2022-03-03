@@ -12,7 +12,7 @@
 echo `hostname`
 module load cuda/11.1.1
 module load gcc/6.4.0
-# source activate torch1.3
+source activate moviecuts
 
 DIR=/ibex/ai/home/pardogl/LTC-e2e
 cd $DIR
