@@ -60,7 +60,8 @@ def get_dataloader(config):
                     snippet_size=config.data.snippet_size,
                     data_percent=config.data.data_percent,
                     distribution=config.data.distribution,
-                    transform=transforms_train)
+                    transform=transforms_train,
+                    negative_portion=config.data.negative_portion)
     logging.info(f'Num samples for train: {len(train_dataset)}')
 
     val_dataset = CutTypeDataset([config.data.shots_file_train, config.data.shots_file_val],
@@ -125,7 +126,7 @@ class Model(pl.LightningModule):
         self._train_dataloader, self._val_dataloader, self._test_dataloader = get_dataloader(config)
 
         self.cut_types = self._train_dataloader.dataset.cut_types
-        self.num_classes = len(self.cut_types)
+        self.num_classes = len(self.cut_types) + 1 if config.data.negative_portion else len(self.cut_types)
         self.params = None
         self.initialization = config.training.initialization
         self.world_size = world_size

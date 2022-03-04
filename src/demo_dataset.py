@@ -187,7 +187,7 @@ if __name__ == "__main__":
     dataloader = DataLoader(
             dataset,
             batch_size=1,
-            num_workers=0,
+            num_workers=4,
             pin_memory=True,
             shuffle=False)
         

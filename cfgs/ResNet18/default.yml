@@ -17,6 +17,7 @@ data:
   window_sampling: fixed # choose between ['gaussian', 'uniform', 'fixed']
   distribution: natural # choose between ['natural', 'uniform', 'sqrt']
   data_percent: 1 # *100 percetange of data to train with
+  negative_portion: 0
 
 # ---------------------------------------------------------------------------- #
 # Networks params

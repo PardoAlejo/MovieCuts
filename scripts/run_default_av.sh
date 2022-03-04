@@ -29,12 +29,14 @@ scale_h=128 # Scale H to read
 scale_w=180 # Scale W to read
 crop_size=112 # crop size to input the network
 INF=0
+NEG_PORTION=0.1
 
 python src/main.py --cfg cfgs/ResNet18/default.yml \
     --data.videos_path /ibex/ai/project/c2114/data/movies/framed_clips\
     --data.scale_h $scale_h\
     --data.scale_w $scale_w\
     --data.crop_size $crop_size\
+    --data.negative_portion $NEG_PORTION \
     --training.num_workers $NUM_WORKERS \
     --batch_size $BATCH_SIZE \
     --data.snippet_size $SNIPPET_SIZE\

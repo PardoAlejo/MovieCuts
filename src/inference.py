@@ -61,7 +61,7 @@ if __name__ == "__main__":
         new_state_dict[name.replace('audio_visual_network.','')] = params
     model.load_state_dict(new_state_dict)
 
-    base_path = '/ibex/ai/home/pardogl/LTC-e2e/User_Study'
+    base_path = './User_Study'
     info_df = pd.read_csv(f'{base_path}/video_info.csv')
     
     # video_paths = ['/ibex/ai/home/pardogl/c2114/data/movies/demo/1A-3.mov',

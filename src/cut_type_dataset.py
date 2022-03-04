@@ -34,6 +34,7 @@ class CutTypeDataset(Dataset):
                  time_audio_span=10,
                  data_percent=0.1,
                  distribution='natural',
+                 negative_portion=0.0,
                  seed=4165):
         
         self.seed = seed
@@ -92,16 +93,27 @@ class CutTypeDataset(Dataset):
         self.augment_temporal_shift = augment_temporal_shift
         self.pos_delta_range = pos_delta_range
 
+        self.negative_portion = negative_portion
         self.candidates = None
         self.clips_to_fps = dict(zip(self.shots_df.clip_id.tolist(),self.shots_df.fps.tolist()))
 
         if self.mode == 'train':
-            self.cache_filename = f'{self.cache_path}/candidates_{self.mode}_distribution_{self.distribution}_cut_type_percent_{int(data_percent*100)}.json'
+            if not negative_portion:
+                self.cache_filename = f'{self.cache_path}/candidates_{self.mode}_distribution_{self.distribution}_cut_type_percent_{int(data_percent*100)}.json'
+            else:
+                self.cache_filename = f'{self.cache_path}/candidates_{self.mode}_distribution_{self.distribution}_cut_type_percent_{int(data_percent*100)}_negs.json'
         else:
-            self.cache_filename = f'{self.cache_path}/candidates_{self.mode}_distribution_{self.distribution}_cut_type_percent_{int(1*100)}.json'
-        
+            if not negative_portion:
+                self.cache_filename = f'{self.cache_path}/candidates_{self.mode}_distribution_{self.distribution}_cut_type_percent_{int(1*100)}.json'
+            else:
+                self.cache_filename = f'{self.cache_path}/candidates_{self.mode}_distribution_{self.distribution}_cut_type_percent_{int(1*100)}_negs.json'
+            
         if not os.path.exists(self.cache_filename):
             self.set_candidates()
+            if negative_portion:
+                self.set_negatives()
+            self.save_cache()
+            
         else:
             logging.info(f'Cache file found at: {self.cache_filename}')
             self.read_cache_candidates()
@@ -238,6 +250,21 @@ class CutTypeDataset(Dataset):
         self.candidates = json.load(open(self.cache_filename))
         logging.info('Candidates read from cache file')
 
+    def set_negatives(self):
+        logging.info(f'Setting Negative candidates for {self.mode}')
+        neg_keys = random.sample(list(self.candidates.keys()),int(self.negative_portion*len(self.candidates)))
+        # Add an extra class in the annotations for negatives
+        for key, items in self.candidates.items():
+            items['labels'].append(0)
+            
+        labels = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
+        for key in neg_keys:
+            neg_name = f'{key}_neg'
+            times = self.candidates[key]['shot_times']
+            cut_time = random.uniform(times[0],times[-1])
+            self.candidates[neg_name] = {'shot_times': [times[0], cut_time, times[-1]],
+                                         'labels': labels}
+        
     def set_candidates(self):
         logging.info(f'Setting candidates for {self.mode}')
         self.candidates = {}
@@ -262,10 +289,10 @@ class CutTypeDataset(Dataset):
             else:
                 self.candidates[clip_name] = {'shot_times':shot_times, 'labels':this_labels}
 
+            with open(f'.cache/not_label_{self.mode}_list.json', 'w') as f:
+                json.dump(not_labeled_clips, f)
+    
+    def save_cache(self):
         logging.info(f'Saving cache candidates file in: {self.cache_filename}')
         with open(self.cache_filename, 'w') as f:
             json.dump(self.candidates, f)
-
-        with open(f'.cache/not_label_{self.mode}_list.json', 'w') as f:
-            json.dump(not_labeled_clips, f)
-
