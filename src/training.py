@@ -72,7 +72,8 @@ def get_dataloader(config):
                     audio_stream=config.model.audio_stream,
                     sampling=config.data.window_sampling,
                     snippet_size=config.data.snippet_size,
-                    transform=transforms_val)
+                    transform=transforms_val,
+                    negative_portion=config.data.negative_portion)
 
     logging.info(f'Num samples for val: {len(val_dataset)}')
 
@@ -84,7 +85,8 @@ def get_dataloader(config):
                     audio_stream=config.model.audio_stream,
                     sampling=config.data.window_sampling,
                     snippet_size=config.data.snippet_size,
-                    transform=transforms_val)
+                    transform=transforms_val,
+                    negative_portion=config.data.negative_portion)
     
     train_dataloader = DataLoader(
             train_dataset,

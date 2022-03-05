@@ -125,6 +125,7 @@ if __name__ == "__main__":
             f'_vbeta-{config.model.vbeta}',
             f'_avbeta-{config.model.avbeta}',
             f'_bs-{config.batch_size}',
+            f'_negatives-{config.data.negative_portion}',
             f'validation_set-{config.inference.validation}',
             f'test_set-{config.inference.test}']
     # -- Logger and Directories--

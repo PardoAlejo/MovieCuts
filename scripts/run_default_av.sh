@@ -29,7 +29,7 @@ scale_h=128 # Scale H to read
 scale_w=180 # Scale W to read
 crop_size=112 # crop size to input the network
 INF=0
-NEG_PORTION=0.1
+# NEG_PORTION=0.1
 
 python src/main.py --cfg cfgs/ResNet18/default.yml \
     --data.videos_path /ibex/ai/project/c2114/data/movies/framed_clips\
@@ -44,7 +44,7 @@ python src/main.py --cfg cfgs/ResNet18/default.yml \
     --model.vbeta $VBETA \
     --model.abeta $ABETA \
     --model.avbeta $AVBETA\
-    --base_exp_dir final_experiments \
+    --base_exp_dir eccv22_experiments \
     --inference.multi_modal_inference $INF \
     --data.window_sampling gaussian \
-    --wandb.use_wandb True
+    --wandb.use_wandb False

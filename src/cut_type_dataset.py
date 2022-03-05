@@ -98,25 +98,19 @@ class CutTypeDataset(Dataset):
         self.clips_to_fps = dict(zip(self.shots_df.clip_id.tolist(),self.shots_df.fps.tolist()))
 
         if self.mode == 'train':
-            if not negative_portion:
-                self.cache_filename = f'{self.cache_path}/candidates_{self.mode}_distribution_{self.distribution}_cut_type_percent_{int(data_percent*100)}.json'
-            else:
-                self.cache_filename = f'{self.cache_path}/candidates_{self.mode}_distribution_{self.distribution}_cut_type_percent_{int(data_percent*100)}_negs.json'
+            self.cache_filename = f'{self.cache_path}/candidates_{self.mode}_distribution_{self.distribution}_cut_type_percent_{int(data_percent*100)}.json'
         else:
-            if not negative_portion:
-                self.cache_filename = f'{self.cache_path}/candidates_{self.mode}_distribution_{self.distribution}_cut_type_percent_{int(1*100)}.json'
-            else:
-                self.cache_filename = f'{self.cache_path}/candidates_{self.mode}_distribution_{self.distribution}_cut_type_percent_{int(1*100)}_negs.json'
-            
+            self.cache_filename = f'{self.cache_path}/candidates_{self.mode}_distribution_{self.distribution}_cut_type_percent_{int(1*100)}.json'
+           
         if not os.path.exists(self.cache_filename):
             self.set_candidates()
-            if negative_portion:
-                self.set_negatives()
             self.save_cache()
-            
         else:
             logging.info(f'Cache file found at: {self.cache_filename}')
             self.read_cache_candidates()
+            
+        if negative_portion:
+            self.set_negatives()
 
         logging.info(f"Number of candidates for {self.mode}: {len(self.candidates)}")
 
@@ -165,15 +159,20 @@ class CutTypeDataset(Dataset):
         """
         clip_path path to clip frames
         """
-        cut_id = int(cut_time*fps)
+        cut_id = int(np.floor(cut_time*fps))
         ids = self.sampling_function(cut_id, window)
 
         filenames = [f'{clip_path}/frames/{i:06d}.jpg' for i in ids]
         frames = []
         
         for f in filenames:
-            img = read_image(f)
-            frames.append(img)
+            if os.path.exists(f):
+                # print(f)
+                img = read_image(f)
+                frames.append(img)
+            else:
+                print(f'File {f} not found')
+                continue
 
         frames = torch.stack(frames, 1)
 
@@ -256,12 +255,13 @@ class CutTypeDataset(Dataset):
         # Add an extra class in the annotations for negatives
         for key, items in self.candidates.items():
             items['labels'].append(0)
-            
+          
         labels = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
-        for key in neg_keys:
+        tol_th = 0.5 #pick cuts max tol_th from the end of the video
+        for key in tqdm(neg_keys):
             neg_name = f'{key}_neg'
             times = self.candidates[key]['shot_times']
-            cut_time = random.uniform(times[0],times[-1])
+            cut_time = random.uniform(times[0],times[-1]-tol_th)
             self.candidates[neg_name] = {'shot_times': [times[0], cut_time, times[-1]],
                                          'labels': labels}
         
