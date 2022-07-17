@@ -42,5 +42,4 @@ python src/main.py --cfg cfgs/ResNet18/default.yml \
     --inference.save_path ${SAVE_PATH} \
     --mode.train False \
     --mode.inference True \
-    --inference.validation False \
-    --inference.test True
+    --inference.validation True
