@@ -71,8 +71,18 @@ Inference on val set
 sh scripts/run_testing.sh
 ```
 
-## Expected results (Table 1 of the Paper):
-
+## Expected results:
+Model mAP: 47.91%
+AP for cut-on-action: 65.67%
+AP for cut-away: 62.98%
+AP for cross-cut: 34.31%
+AP for emphasis/deemphasis: 31.52%
+AP for match-cut: 2.43%
+AP for smash-cut: 25.01%
+AP for reaction-in/reaction-out-cut: 83.13%
+AP for l-cut: 44.86%
+AP for j-cut: 52.02%
+AP for speaker-change: 77.21%
 </br>
 
 # Training
