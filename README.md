@@ -14,32 +14,6 @@ conda env create -f environment.yml
 ```
 
 # Data
-To download the data, please install [gsutil](https://cloud.google.com/storage/docs/gsutil_install). Once [gsutil](https://cloud.google.com/storage/docs/gsutil_install) is installed download the frames and annotations by following:
-
-```bash
-mkdir data
-```
-FRAMES:
-```bash
-gsutil -m cp -r "gs://pardogl/moviecuts/zipped_frames.zip" data
-```
-
-ANNOTATIONS
-```bash
-gsutil -m cp \
-  "gs://pardogl/moviecuts/annotations/cut-type-test.json" \
-  "gs://pardogl/moviecuts/annotations/cut-type-train.json" \
-  "gs://pardogl/moviecuts/annotations/cut-type-val.json" \
-  data
-```
-PRETRAINED MODELS:
-```bash
-gsutil -m cp \
-  "gs://pardogl/moviecuts/model_checkpoints/epoch=7_Validation_loss=1.91.ckpt" \
-  "gs://pardogl/moviecuts/model_checkpoints/r2plus1d_18-91a641e6.pth" \
-  "gs://pardogl/moviecuts/model_checkpoints/vggsound_avgpool.pth.tar" \
-  checkpoints
-```
 
 The folder structure should be as follows:
 ```
@@ -47,9 +21,12 @@ README.md
 ltc-env.yml
 │
 ├── data
+│   ├── annotated_clips_train.csv
+│   ├── annotated_clips_valv
 │   ├── cut-type-test.json
 │   ├── cut-type-train.json
 │   ├── cut-type-val.json
+│   ├── framed_clips/
 │   └── zipped_frames.zip
 │
 ├── checkpoints
@@ -62,6 +39,21 @@ ltc-env.yml
 ├── cfg
 └── src
 ```
+
+Download the frames and annotations by following:
+
+```bash
+mkdir data
+```
+
+FRAMES: 
+Download the frames [here](https://drive.google.com/file/d/1F57OLtlRxYUMVAFZNZAQ7jj1GCMB3oG-/view?usp=sharing). Unzip the frames under ```data/```.
+
+ANNOTATIONS
+Download the annotations files from [here](https://drive.google.com/drive/folders/1crYrtWDDmiNA9eZTfz1D58GQuCN7Im27?usp=sharing).
+
+CHECKPOINTS
+Download the pre-trained models from [here](https://drive.google.com/drive/folders/1SrtYl2E1ftv6tikwiSz_38JjgTplLT-c?usp=sharing).
 
 # Inference
 
