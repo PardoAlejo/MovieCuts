@@ -73,7 +73,7 @@ sh scripts/run_testing.sh
 
 ## Expected results:
 
-| Class             | AP %  |
+| **Class**         | **AP** (%)|
 |-------------------|-------|
 | Cutting on Action | 65.67 |
 | Cut Away          | 62.98 |
@@ -86,8 +86,7 @@ sh scripts/run_testing.sh
 | J Cut             | 52.02 |
 | Speaker-Change Cut| 77.21 |
 | Speaker-Change Cut| 77.21 |
-|-------------------|-------|
-| Mean              | 47.91 |
+| **Mean**          | **47.91** |
 </br>
 
 # Training
