@@ -46,7 +46,7 @@ Download the frames and annotations by following:
 mkdir data
 ```
 Videos and Annotations:
-To request access to the videos and annotations, please fill up [this form](https://github.com/open-mmlab/mmaction2), agree with all the terms and you will receive and email with a link to access the data.
+To request access to the videos and annotations, please fill up [this form](https://forms.gle/FUNnZ8wpYRCspTJq9), agree with all the terms and you will receive and email with a link to access the data.
 
 CHECKPOINTS
 Download the pre-trained models from [here](https://drive.google.com/drive/folders/1SrtYl2E1ftv6tikwiSz_38JjgTplLT-c?usp=sharing).
