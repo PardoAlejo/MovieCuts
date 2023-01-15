@@ -15,6 +15,10 @@ conda env create -f environment.yml
 
 # Data
 
+**PLEASE READ!**
+
+Currently the links are under maitenance. It will take a couple of days to be fixed. If you are interested in the data fill the Google form below, and in a couple of days I'll send directly to you the updated links to downlaod the data. 
+
 ## Videos and Annotations:
 
 *VIDEOS*: To request access to the videos, please fill up [this form](https://forms.gle/FUNnZ8wpYRCspTJq9), agree with all the terms and you will receive and email with a link to access the data.
