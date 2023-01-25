@@ -14,32 +14,18 @@ conda env create -f environment.yml
 ```
 
 # Data
-To download the data, please install [gsutil](https://cloud.google.com/storage/docs/gsutil_install). Once [gsutil](https://cloud.google.com/storage/docs/gsutil_install) is installed download the frames and annotations by following:
 
-```bash
-mkdir data
-```
-FRAMES:
-```bash
-gsutil -m cp -r "gs://pardogl/moviecuts/zipped_frames.zip" data
-```
+**PLEASE READ!**
 
-ANNOTATIONS
-```bash
-gsutil -m cp \
-  "gs://pardogl/moviecuts/annotations/cut-type-test.json" \
-  "gs://pardogl/moviecuts/annotations/cut-type-train.json" \
-  "gs://pardogl/moviecuts/annotations/cut-type-val.json" \
-  data
-```
-PRETRAINED MODELS:
-```bash
-gsutil -m cp \
-  "gs://pardogl/moviecuts/model_checkpoints/epoch=7_Validation_loss=1.91.ckpt" \
-  "gs://pardogl/moviecuts/model_checkpoints/r2plus1d_18-91a641e6.pth" \
-  "gs://pardogl/moviecuts/model_checkpoints/vggsound_avgpool.pth.tar" \
-  checkpoints
-```
+Currently the links are under maitenance. It will take a couple of days to be fixed. If you are interested in the data fill the Google form below, and in a couple of days I'll send directly to you the updated links to downlaod the data. 
+
+## Videos and Annotations:
+
+*VIDEOS*: To request access to the videos, please fill up [this form](https://forms.gle/FUNnZ8wpYRCspTJq9), agree with all the terms and you will receive and email with a link to access the data.
+
+*ANNOTATIONS*: Please find the annotations here: [annotations](https://drive.google.com/drive/folders/1crYrtWDDmiNA9eZTfz1D58GQuCN7Im27?usp=sharing)
+CHECKPOINTS
+
 
 The folder structure should be as follows:
 ```
@@ -47,9 +33,12 @@ README.md
 ltc-env.yml
 │
 ├── data
+│   ├── annotated_clips_train.csv
+│   ├── annotated_clips_valv
 │   ├── cut-type-test.json
 │   ├── cut-type-train.json
 │   ├── cut-type-val.json
+│   ├── framed_clips/
 │   └── zipped_frames.zip
 │
 ├── checkpoints
@@ -65,6 +54,9 @@ ltc-env.yml
 
 # Inference
 
+*PRE-TRAINED MODELS*: Download the pre-trained models from [here](https://drive.google.com/drive/folders/1SrtYl2E1ftv6tikwiSz_38JjgTplLT-c?usp=sharing).
+
+
 Copy paste the following commands in the terminal. </br>
 
 
@@ -79,8 +71,22 @@ Inference on val set
 sh scripts/run_testing.sh
 ```
 
-## Expected results (Table 1 of the Paper):
+## Expected results:
 
+| **Class**         | **AP** (%)|
+|-------------------|-------|
+| Cutting on Action | 65.67 |
+| Cut Away          | 62.98 |
+| Cross Cut         | 34.31 |
+| Emphasis Cut      | 31.52 |
+| Match Cut         | 2.43  |
+| Smash Cut         | 25.01 |
+| Reaction Cut      | 83.13 |
+| L Cut             | 44.86 |
+| J Cut             | 52.02 |
+| Speaker-Change Cut| 77.21 |
+| Speaker-Change Cut| 77.21 |
+| **Mean**          | **47.91** |
 </br>
 
 # Training
