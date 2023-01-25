@@ -128,7 +128,7 @@ class Model(pl.LightningModule):
         self._train_dataloader, self._val_dataloader, self._test_dataloader = get_dataloader(config)
 
         self.cut_types = self._train_dataloader.dataset.cut_types
-        self.num_classes = len(self.cut_types) + 1 if config.data.negative_portion else len(self.cut_types)
+        self.num_classes = len(self.cut_types)
         self.params = None
         self.initialization = config.training.initialization
         self.world_size = world_size
@@ -255,8 +255,6 @@ class Model(pl.LightningModule):
                     on_step=True, 
                     on_epoch=True, 
                     logger=True)
-
-        
         self.log('Traning_loss', loss, 
                     on_step=True, 
                     on_epoch=True, 

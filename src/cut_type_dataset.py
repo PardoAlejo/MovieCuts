@@ -110,6 +110,7 @@ class CutTypeDataset(Dataset):
             self.read_cache_candidates()
             
         if negative_portion:
+            self.cut_types.append('negative')
             self.set_negatives()
 
         logging.info(f"Number of candidates for {self.mode}: {len(self.candidates)}")
