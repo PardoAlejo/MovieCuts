@@ -16,3 +16,4 @@ examples*
 *experiments*
 .logs*
 dcgm/
+checkpoints/
