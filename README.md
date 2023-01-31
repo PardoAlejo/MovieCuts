@@ -23,8 +23,17 @@ Currently the links are under maitenance. It will take a couple of days to be fi
 
 *VIDEOS*: To request access to the videos, please fill up [this form](https://forms.gle/FUNnZ8wpYRCspTJq9), agree with all the terms and you will receive and email with a link to access the data.
 
-*ANNOTATIONS*: Please find the annotations here: [annotations](https://drive.google.com/drive/folders/1crYrtWDDmiNA9eZTfz1D58GQuCN7Im27?usp=sharing)
-CHECKPOINTS
+After receiving the link, please download each one of the zip files (the zip file is partionioed acrross 10 zip files).
+
+After all the files are downloaded (the have to be 12 of them), run the following to combine the files into a single zip:
+
+` zip -s 0 moviecuts.zip --out moviecuts_single_file.zip `
+
+Then you can simply unzip the folder and place it under data:
+
+`unzip moviecuts_single.zip -d ./data/ `
+
+*PRE-TRAINED MODELS/Checkpoints*: Download the pre-trained models and required checkpoints from [here](https://drive.google.com/drive/folders/1SrtYl2E1ftv6tikwiSz_38JjgTplLT-c?usp=sharing).
 
 
 The folder structure should be as follows:
@@ -34,7 +43,7 @@ ltc-env.yml
 │
 ├── data
 │   ├── annotated_clips_train.csv
-│   ├── annotated_clips_valv
+│   ├── annotated_clips_val.csv
 │   ├── cut-type-test.json
 │   ├── cut-type-train.json
 │   ├── cut-type-val.json
@@ -53,8 +62,6 @@ ltc-env.yml
 ```
 
 # Inference
-
-*PRE-TRAINED MODELS*: Download the pre-trained models from [here](https://drive.google.com/drive/folders/1SrtYl2E1ftv6tikwiSz_38JjgTplLT-c?usp=sharing).
 
 
 Copy paste the following commands in the terminal. </br>
