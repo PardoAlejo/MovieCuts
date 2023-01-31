@@ -11,6 +11,8 @@ import soundfile as sf
 import json
 import matplotlib.pyplot as plt
 import logging
+import io, zipfile
+from PIL import Image
 
 class CutTypeDataset(Dataset):
     """Construct an untrimmed video classification dataset.
@@ -35,11 +37,12 @@ class CutTypeDataset(Dataset):
                  data_percent=0.1,
                  distribution='natural',
                  negative_portion=0.0,
-                 seed=4165):
+                 seed=4165,
+                 zip_file_obj=None):
         
         self.seed = seed
         self.mode = 'train' if 'train' in cut_type_filename else 'val' if 'val' in cut_type_filename else 'test'
-
+        
         dataframes = []
         for filename in shots_filenames:
             this_shots_df = pd.read_csv(filename)
@@ -52,6 +55,21 @@ class CutTypeDataset(Dataset):
         if not os.path.exists(self.cache_path):
             os.makedirs(self.cache_path)
 
+        self._is_data_zipped = zipfile.is_zipfile(self.videos_path)
+        # Define how to read the frames
+        # If zip file given, read frames as zipfile objects
+        # If folder (unzipped), read frames as images
+        if self._is_data_zipped:
+            logging.info(f'Reading directly from ZIP, sending zip object to memmory: {self.videos_path}, this can take a while...')
+            self.zip_file = zip_file_obj
+            self.read_frame = self.read_frame_from_zip
+            self.read_audio = self.read_audio_from_zip
+            self._exists = self._exists_in_zip
+        else:
+            self.read_frame = read_image
+            self.read_audio = sf.read
+            self._exists = os.path.exists
+            
         self.data_percent = data_percent
 
         self.transform = transform
@@ -119,7 +137,23 @@ class CutTypeDataset(Dataset):
 
     def __len__(self):
         return min(len(self.candidate_names),len(self.clip_names))
-
+    
+    def _exists_in_zip(self, path):
+        if str.encode(path) in self.zip_file.namelist():
+            return True
+        else:
+            return False
+        
+    def read_frame_from_zip(self, path):
+        img_bytes = self.zip_file.read(str.encode(path))
+        pil_img = Image.open(io.BytesIO(img_bytes))
+        return torch.as_tensor(np.array(pil_img))
+    
+    def read_audio_from_zip(self, path):
+        audio_bytes = self.zip_file.read(str.encode(path))
+        audio, samplerate = sf.read(io.BytesIO(audio_bytes))
+        return audio, samplerate
+    
     def get_average_shots_per_scene(self):
         num_shots = 0
         for name, df in self.shots_df_by_video_id:
@@ -130,7 +164,7 @@ class CutTypeDataset(Dataset):
     def get_clip_audio(self, clip_path):
         clip_name = os.path.basename(clip_path)
         audio_path = f'{clip_path}/{clip_name}.wav'
-        audio, samplerate = sf.read(audio_path)
+        audio, samplerate = self.read_audio(audio_path)
         span_audio = int(self.time_audio_span*samplerate)
 
         if len(audio) < span_audio:
@@ -167,14 +201,15 @@ class CutTypeDataset(Dataset):
         frames = []
         
         for f in filenames:
-            if os.path.exists(f):
+            if self._exists(f):
                 # print(f)
-                img = read_image(f)
+                img = self.read_frame(f)
                 frames.append(img)
             else:
                 print(f'File {f} not found')
                 continue
-
+            # img = self.read_frame(f)
+            # frames.append(img)
         frames = torch.stack(frames, 1)
 
         return frames
@@ -209,7 +244,11 @@ class CutTypeDataset(Dataset):
         candidate_name = self.candidate_names[idx]
         # remove the _cand number from name coming from the repetition of samples on set_candidates
         clip_name = candidate_name[:36]
-        clip_path = f'{self.videos_path}/{clip_name}'
+        if self._is_data_zipped:
+            clip_path = f'framed_clips/{clip_name}'
+        else:
+            clip_path = f'{self.videos_path}/{clip_name}'
+            
         labels = torch.tensor(self.candidates[candidate_name]['labels'])
         # set each label as 1/k for k number of classes of the sample
         labels = labels/labels.sum()

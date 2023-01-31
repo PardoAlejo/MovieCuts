@@ -17,6 +17,7 @@ from scheduler import WarmupMultiStepLR
 from callbacks import MultilabelAP
 import logging 
 logging.basicConfig(level=logging.DEBUG)
+import zipfile
 
 def sigmoid(X):
     return 1/(1+torch.exp(-X.squeeze()))
@@ -50,7 +51,13 @@ def get_dataloader(config):
     
     transforms_train, transforms_val = get_transforms(config)
 
-    train_dataset = CutTypeDataset([config.data.shots_file_train, config.data.shots_file_val],
+    if zipfile.is_zipfile(config.data.videos_path):
+        logging.info('Using zip file, sending ZIP to memory, this may take a while...')
+        zip_file_obj = zipfile.ZipFile(config.data.videos_path)
+    else:
+        zip_file_obj = None
+        
+    dataset_train = CutTypeDataset([config.data.shots_file_train, config.data.shots_file_val],
                     config.data.cut_type_file_name_train,
                     videos_path=config.data.videos_path,
                     cache_path=config.data.cache_path,
@@ -61,10 +68,11 @@ def get_dataloader(config):
                     data_percent=config.data.data_percent,
                     distribution=config.data.distribution,
                     transform=transforms_train,
-                    negative_portion=config.data.negative_portion)
-    logging.info(f'Num samples for train: {len(train_dataset)}')
+                    negative_portion=config.data.negative_portion,
+                    zip_file_obj=zip_file_obj)
+    logging.info(f'Num samples for training: {len(dataset_train)}')
 
-    val_dataset = CutTypeDataset([config.data.shots_file_train, config.data.shots_file_val],
+    dataset_val = CutTypeDataset([config.data.shots_file_train, config.data.shots_file_val],
                     config.data.cut_type_file_name_val,
                     videos_path=config.data.videos_path,
                     cache_path=config.data.cache_path,
@@ -73,11 +81,12 @@ def get_dataloader(config):
                     sampling=config.data.window_sampling,
                     snippet_size=config.data.snippet_size,
                     transform=transforms_val,
-                    negative_portion=config.data.negative_portion)
+                    negative_portion=config.data.negative_portion,
+                    zip_file_obj=zip_file_obj)
 
-    logging.info(f'Num samples for val: {len(val_dataset)}')
+    logging.info(f'Num samples for val: {len(dataset_val)}')
 
-    test_dataset = CutTypeDataset([config.data.shots_file_train, config.data.shots_file_val],
+    dataset_test = CutTypeDataset([config.data.shots_file_train, config.data.shots_file_val],
                     config.data.cut_type_file_name_test,
                     videos_path=config.data.videos_path,
                     cache_path=config.data.cache_path,
@@ -86,25 +95,28 @@ def get_dataloader(config):
                     sampling=config.data.window_sampling,
                     snippet_size=config.data.snippet_size,
                     transform=transforms_val,
-                    negative_portion=config.data.negative_portion)
+                    negative_portion=config.data.negative_portion,
+                    zip_file_obj=zip_file_obj)
     
     train_dataloader = DataLoader(
-            train_dataset,
+            dataset_train,
             batch_size=config.batch_size,
             num_workers=config.num_workers,
             pin_memory=True,
             shuffle=False,
             drop_last=True)
-
+    
+    
     val_dataloader = DataLoader(
-            val_dataset,
+            dataset_val,
             batch_size=config.batch_size,
             num_workers=config.num_workers,
             pin_memory=True,
             shuffle=False)
 
+
     test_dataloader = DataLoader(
-            test_dataset,
+            dataset_test,
             batch_size=config.batch_size,
             num_workers=config.num_workers,
             pin_memory=True,
