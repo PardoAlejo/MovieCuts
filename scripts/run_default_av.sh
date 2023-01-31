@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash --login
 #SBATCH --job-name MCe2eAV
 #SBATCH --array=0
 #SBATCH --time=16:00:00
@@ -12,13 +12,13 @@
 echo `hostname`
 module load cuda/11.1.1
 module load gcc/6.4.0
-source activate moviecuts
+conda activate torch1.3
 
-DIR=/ibex/ai/home/pardogl/LTC-e2e
+DIR=/ibex/ai/home/pardogl/MovieCuts
 cd $DIR
 echo `pwd`
 
-BATCH_SIZE=112
+BATCH_SIZE=8
 NUM_WORKERS=6
 SNIPPET_SIZE=16
 LR=0.03
@@ -29,7 +29,7 @@ scale_h=128 # Scale H to read
 scale_w=180 # Scale W to read
 crop_size=112 # crop size to input the network
 INF=0
-# NEG_PORTION=0.1
+NEG_PORTION=0.0
 
 python src/main.py --cfg cfgs/ResNet18/default.yml \
     --data.videos_path /ibex/ai/project/c2114/data/movies/framed_clips\
