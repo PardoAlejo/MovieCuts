@@ -17,7 +17,7 @@ conda env create -f environment.yml
 
 **PLEASE READ!**
 
-If you are interested in the data fill this [Google form](https://forms.gle/FUNnZ8wpYRCspTJq9), and in a couple of days I'll send directly to you the  links to downlaod the data. 
+If you are interested in the data fill this [Google form](https://forms.gle/FUNnZ8wpYRCspTJq9), and in a couple of days I'll send directly to you the  links to download the data. 
 
 ## Videos and Annotations:
 
