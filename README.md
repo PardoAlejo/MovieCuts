@@ -23,7 +23,7 @@ If you are interested in the data fill this [Google form](https://forms.gle/FUNn
 
 After receiving the instruction via email, you can download the data from the web interface. The other option is to use the provided script `moviecuts_downloader.py`, you can use it as follows:
 
-` python data/moviecuts_downloader.py --moviecuts_path {PATH_TO_DOWNLOAD_MOVIECUTS} --download_link {LINK} --password {PASSWORD} `
+``` python data/moviecuts_downloader.py --moviecuts_path {PATH_TO_DOWNLOAD_MOVIECUTS} --download_link {LINK} --password {PASSWORD} ```
 
 LINK and PASSWORD are the same provided in the email's instructions.
 
