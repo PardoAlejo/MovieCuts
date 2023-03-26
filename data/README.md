@@ -10,9 +10,10 @@ After receiving the instruction via email, you can download the data from the we
 
 ` python moviecuts_downloader.py --moviecuts_path {PATH_TO_DOWNLOAD_MOVIECUTS} --download_link {LINK} --password {PASSWORD} `
 
-lINK and PASSWORD are the same provided in the email's instructions.
+LINK and PASSWORD are the same provided in the email's instructions.
+
 The script has several options:
-- zip_file_index: To download a specific zip file, if not provided the script will download one by one.
+- --zip_file_index: To download a specific zip file, if not provided the script will download one by one.
 - --download_and_unzip: If provided the script will download and unzip the data afterwards.
 - --unzip: If provided the script will attempt to unzip the data, not that it will check that all zip files are in the folder, if not, it will throw an error.
 
