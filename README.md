@@ -34,6 +34,8 @@ The script has several options:
 - `--download_and_unzip`: If provided the script will download and unzip the data afterwards.
 - `--unzip`: If provided the script will attempt to unzip the data, not that it will check that all zip files are in the folder, if not, it will throw an error.
 
+**Dependencies for moviecuts_downloader.py**: `pip install google-measurement-protocol` and `pip install tqdm`.
+
 ## Videos and Annotations:
 
 *VIDEOS*: To request access to the videos, please fill up [this form](https://forms.gle/FUNnZ8wpYRCspTJq9), agree with all the terms and you will receive and email with a link to access the data.
