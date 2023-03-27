@@ -130,7 +130,7 @@ sh scripts/run_default_av.sh
 ```
 
 
-# Cite us
+# If you find this work useful for you research, please cite us:
 ```bibtex
 @inproceedings{pardo2022moviecuts,
   title={Moviecuts: A new dataset and benchmark for cut type recognition},
