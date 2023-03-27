@@ -131,13 +131,13 @@ sh scripts/run_default_av.sh
 
 
 # Cite us
-```
-@misc{pardo2021moviecuts,
-      title={MovieCuts: A New Dataset and Benchmark for Cut Type Recognition}, 
-      author={Alejandro Pardo and Fabian Caba Heilbron and Juan León Alcázar and Ali Thabet and Bernard Ghanem},
-      year={2021},
-      eprint={2109.05569},
-      archivePrefix={arXiv},
-      primaryClass={cs.CV}
+```bibtex
+@inproceedings{pardo2022moviecuts,
+  title={Moviecuts: A new dataset and benchmark for cut type recognition},
+  author={Pardo, Alejandro and Heilbron, Fabian Caba and Alc{\'a}zar, Juan Le{\'o}n and Thabet, Ali and Ghanem, Bernard},
+  booktitle={Computer Vision--ECCV 2022: 17th European Conference, Tel Aviv, Israel, October 23--27, 2022, Proceedings, Part VII},
+  pages={668--685},
+  year={2022},
+  organization={Springer}
 }
 ```
