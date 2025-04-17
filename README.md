@@ -1,5 +1,6 @@
 # Code for MovieCuts - ECCV2022 
 [![Paper](https://img.shields.io/badge/Paper-arXiv-b31b1b?logo=arxiv&logoColor=red)](https://arxiv.org/abs/2109.05569)
+
 MovieCuts and Learning to cut end-to-end pretrained modules
 
 ## Requirements
